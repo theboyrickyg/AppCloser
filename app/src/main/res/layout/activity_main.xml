@@ -388,6 +388,20 @@
         android:nestedScrollingEnabled="false"
         android:paddingBottom="12dp" />
 
+    <!-- Also wipe the Recents screen (the app cards) after Close All -->
+    <Switch
+        android:id="@+id/recentsSwitch"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="24dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="24dp"
+        android:minHeight="48dp"
+        android:text="Also clear the Recents screen"
+        android:textColor="@color/text_dim"
+        android:textSize="15sp"
+        android:visibility="gone" />
+
     <!-- Instant mode (Developer options) is tucked away here for confident users -->
     <Button
         android:id="@+id/instantLink"

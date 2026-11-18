@@ -49,7 +49,7 @@ class QuickSweepActivity : AppCompatActivity() {
                     .map { it.packageName to it.label }
                 if (svc != null && targets.isNotEmpty()) {
                     Unlock.useClean(applicationContext)
-                    svc.sweep(targets, finish = SweepAccessibilityService.Finish.GO_HOME)
+                    svc.sweep(targets, finish = SweepAccessibilityService.Finish.GO_HOME, clearRecents = Prefs.clearRecents(applicationContext))
                     finishAndRemoveTask()
                     return@launch
                 }
@@ -77,7 +77,7 @@ class QuickSweepActivity : AppCompatActivity() {
             status.text = "Sweeping…"
             Unlock.useClean(applicationContext)
             val r = withContext(Dispatchers.IO) {
-                sweeper.sweepAll(sweeper.scan(includeSystem = false))
+                sweeper.sweepAll(sweeper.scan(includeSystem = false), clearRecents = Prefs.clearRecents(applicationContext))
             }
             Unlock.addTotals(applicationContext, r.closed, r.cacheFreed)
             status.text = "All clean ✓"

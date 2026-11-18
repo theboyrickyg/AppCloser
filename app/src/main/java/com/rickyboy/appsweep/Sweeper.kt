@@ -286,7 +286,12 @@ class Sweeper(private val ctx: Context) {
     }
 
     /** The big button. [onProgress] gets 0–100 as it goes (called from a background thread). */
-    fun sweepAll(apps: List<RunningApp>, onProgress: (Int) -> Unit = {}, onClosed: (String) -> Unit = {}): SweepResult {
+    fun sweepAll(
+        apps: List<RunningApp>,
+        onProgress: (Int) -> Unit = {},
+        onClosed: (String) -> Unit = {},
+        clearRecents: Boolean = false
+    ): SweepResult {
         val targets = apps.filter { it.isRunning && !it.isProtected && !it.isSystem }
         val ramBefore = availableRam()
         val diskBefore = freeStorage()
@@ -302,6 +307,8 @@ class Sweeper(private val ctx: Context) {
         Shell.exec("am kill-all")            // other cached background processes that are safe to kill
         onProgress(75)
         Shell.exec("pm trim-caches 999G")    // every app's cache
+        onProgress(85)
+        if (clearRecents) clearRecentsShell()
         onProgress(90)
         Thread.sleep(3000)                   // let Android reclaim memory before measuring
         onProgress(100)
@@ -311,6 +318,24 @@ class Sweeper(private val ctx: Context) {
             ramFreed = (availableRam() - ramBefore).coerceAtLeast(0),
             cacheFreed = (freeStorage() - diskBefore).coerceAtLeast(0)
         )
+    }
+
+    /**
+     * Empties the Recents screen without showing it. "am clear-recent-apps" does it in one go;
+     * older Android versions remove the cards one by one instead.
+     */
+    private fun clearRecentsShell() {
+        val out = try { Shell.exec("am clear-recent-apps 2>&1") } catch (_: Exception) { "Error" }
+        val failed = out.contains("Unknown command", true) || out.contains("Error", true) || out.contains("Exception", true)
+        if (!failed) return
+        try {
+            val dump = Shell.exec("dumpsys activity recents")
+            Regex("""Recent #\d+: Task\{\w+ #(\d+) type=standard A=\d+:([\w.]+)""")
+                .findAll(dump)
+                .filter { it.groupValues[2] != ctx.packageName }
+                .forEach { Shell.exec("am stack remove ${it.groupValues[1]}") }
+        } catch (_: Exception) {
+        }
     }
 
     // ---------- Device stats ----------

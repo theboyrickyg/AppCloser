@@ -200,7 +200,8 @@ class SweepAccessibilityService : AccessibilityService() {
         apps: List<Pair<String, String>>,
         forceStop: Boolean = true,
         clearCache: Boolean = true,
-        finish: Finish = Finish.OPEN_APP
+        finish: Finish = Finish.OPEN_APP,
+        clearRecents: Boolean = false
     ): Boolean {
         if (busy) return false
         busy = true
@@ -243,6 +244,8 @@ class SweepAccessibilityService : AccessibilityService() {
             }
             publish(true, 98, "")
             withContext(Dispatchers.Main) { closeSettingsPage() }
+            // Wipe the Recents screen too, hidden behind the ram like everything else
+            if (clearRecents) try { clearRecentsScreen() } catch (_: Exception) { }
             delay(1500)   // let Android reclaim memory before the "after" reading
             val result = SweepResult(
                 closed = closed,
@@ -267,6 +270,69 @@ class SweepAccessibilityService : AccessibilityService() {
             busy = false
         }
         return true
+    }
+
+    /** "Clear all" on the Recents screen, as phone makers word it. */
+    private val clearAllTexts = listOf(
+        "Clear all", "Close all", "Clear", "Close all apps", "Clear all apps",
+        "Remove all", "Dismiss all", "Clear recent apps", "Clear recents", "Clear memory"
+    )
+
+    private fun findClearAll(): AccessibilityNodeInfo? =
+        walkFind(1) { n ->
+            val l = label(n)
+            clearAllTexts.any { l.equals(it, ignoreCase = true) } ||
+                (n.viewIdResourceName?.let { id -> id.contains("clear_all") || id.contains("clearAll") || id.contains("clear_recent") } == true)
+        }.firstOrNull()
+
+    /**
+     * Opens the Recents screen and presses its own "Clear all". On Pixel-style phones
+     * (Motorola too) the button sits past the oldest card, so it moves along to it.
+     * If no button turns up it leaves Recents alone.
+     */
+    private suspend fun clearRecentsScreen() {
+        withContext(Dispatchers.Main) { performGlobalAction(GLOBAL_ACTION_RECENTS) }
+        var btn: AccessibilityNodeInfo? = waitFor(1500) { findClearAll() }
+        if (btn == null) {
+            // the list of cards, scrolled by accessibility actions
+            loop@ for (action in listOf(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD, AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)) {
+                for (i in 0 until 12) {
+                    val scroller = walkFind(1) { it.isScrollable }.firstOrNull() ?: break@loop
+                    if (!scroller.performAction(action)) break
+                    delay(220)
+                    btn = findClearAll()
+                    if (btn != null) break@loop
+                }
+            }
+        }
+        if (btn == null) {
+            // no scrollable list reported: swipe along the cards towards the oldest
+            val dm = resources.displayMetrics
+            for (i in 0 until 14) {
+                swipe(dm.widthPixels * 0.12f, dm.widthPixels * 0.88f, dm.heightPixels * 0.5f)
+                delay(260)
+                btn = findClearAll()
+                if (btn != null) break
+            }
+        }
+        val b = btn ?: return
+        click(b)
+        delay(450)
+    }
+
+    private suspend fun swipe(fromX: Float, toX: Float, y: Float) {
+        val path = android.graphics.Path().apply { moveTo(fromX, y); lineTo(toX, y) }
+        val stroke = android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, 160)
+        val gesture = android.accessibilityservice.GestureDescription.Builder().addStroke(stroke).build()
+        val done = kotlinx.coroutines.CompletableDeferred<Unit>()
+        withContext(Dispatchers.Main) {
+            val ok = dispatchGesture(gesture, object : GestureResultCallback() {
+                override fun onCompleted(d: android.accessibilityservice.GestureDescription?) { done.complete(Unit) }
+                override fun onCancelled(d: android.accessibilityservice.GestureDescription?) { done.complete(Unit) }
+            }, null)
+            if (!ok) done.complete(Unit)
+        }
+        kotlinx.coroutines.withTimeoutOrNull(1000) { done.await() }
     }
 
     private fun publish(running: Boolean, pct: Int, current: String) {

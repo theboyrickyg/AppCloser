@@ -92,6 +92,7 @@ class MainActivity : AppCompatActivity() {
     private var autoSweepPending = false
     private var unlockDialog: AlertDialog? = null
     private lateinit var instantLink: Button
+    private lateinit var recentsSwitch: android.widget.Switch
     private var titleTaps = 0
     private var titleTapStart = 0L
 
@@ -171,6 +172,9 @@ class MainActivity : AppCompatActivity() {
         list.itemAnimator = null // smooth live updates, keeps TV remote focus in place
 
         sweepButton.setOnClickListener { sweepAll() }
+        recentsSwitch = findViewById(R.id.recentsSwitch)
+        recentsSwitch.isChecked = Prefs.clearRecents(this)
+        recentsSwitch.setOnCheckedChangeListener { _, on -> Prefs.setClearRecents(this, on) }
         instantLink = findViewById(R.id.instantLink)
         instantLink.setOnClickListener {
             if (setupChoice == "pro" && Adb.hasWorkedBefore(this) && Unlock.isUnlocked(this)) checkConnection(userAsked = true)
@@ -305,6 +309,9 @@ class MainActivity : AppCompatActivity() {
         val isReady = status == Shell.Status.READY
         // Normal mode running: offer Instant mode (or reconnecting it, if it was set up before)
         instantLink.visibility = if (!isTv && isReady && !Shell.isReady()) View.VISIBLE else View.GONE
+        // TV guided closing (no Accessibility, no Instant mode) can't reach the Recents screen
+        recentsSwitch.visibility =
+            if (isReady && (!isTv || SweepAccessibilityService.isOn() || Shell.isReady())) View.VISIBLE else View.GONE
         instantLink.text = if (setupChoice == "pro" && Adb.hasWorkedBefore(this)) "⚡ Reconnect Instant mode" else "⚡ Instant mode (advanced)"
         statusCard.visibility = if (isReady) View.GONE else View.VISIBLE
         sweepButton.isEnabled = isReady && !busy
@@ -820,19 +827,24 @@ class MainActivity : AppCompatActivity() {
             }
             countFreeClean()
             startSweepUi()
-            if (!svc.sweep(targets.map { it.packageName to it.label })) endSweepUi()
+            if (!svc.sweep(targets.map { it.packageName to it.label }, clearRecents = Prefs.clearRecents(this))) endSweepUi()
             return
         }
         countFreeClean()
         startSweepUi()
         lifecycleScope.launch {
+            val clearRecents = Prefs.clearRecents(this@MainActivity)
+            // keep App Closer's own card out of the Recents wipe, so it isn't closed mid-clean
+            if (clearRecents) setOwnRecentsHidden(true)
             val result = withContext(Dispatchers.IO) {
                 sweeper.sweepAll(
                     apps,
                     onProgress = { pct -> runOnUiThread { cleanGauge.setProgress(pct.toFloat()) } },
-                    onClosed = { pkg -> runOnUiThread { removeFromList(pkg) } }
+                    onClosed = { pkg -> runOnUiThread { removeFromList(pkg) } },
+                    clearRecents = clearRecents
                 )
             }
+            if (clearRecents) setOwnRecentsHidden(false)
             cleanGauge.finish()
             showSweepDone(result)
         }
@@ -1148,6 +1160,14 @@ class MainActivity : AppCompatActivity() {
         setupChoice = "easy"
         pairHelper = false
         checkConnection(userAsked = false)
+    }
+
+    private fun setOwnRecentsHidden(hidden: Boolean) {
+        try {
+            (getSystemService(ACTIVITY_SERVICE) as android.app.ActivityManager).appTasks
+                .forEach { it.setExcludeFromRecents(hidden) }
+        } catch (_: Exception) {
+        }
     }
 
     /** Counts one free Close All clean and says how many are left. */
