@@ -97,8 +97,14 @@ object Adb {
 
     fun hasPaired(ctx: Context) = prefs(ctx).getBoolean(KEY_PAIRED, false)
 
-    fun developerOptionsOn(ctx: Context): Boolean =
-        Settings.Global.getInt(ctx.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
+    /** Developer options switched on (USB or wireless debugging being on also means they are). */
+    fun developerOptionsOn(ctx: Context): Boolean = try {
+        Settings.Global.getInt(ctx.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1 ||
+            Settings.Global.getInt(ctx.contentResolver, Settings.Global.ADB_ENABLED, 0) == 1 ||
+            wirelessDebuggingOn(ctx)
+    } catch (_: Exception) {
+        false
+    }
 
     fun wirelessDebuggingOn(ctx: Context): Boolean =
         Build.VERSION.SDK_INT >= 30 && Settings.Global.getInt(ctx.contentResolver, "adb_wifi_enabled", 0) == 1

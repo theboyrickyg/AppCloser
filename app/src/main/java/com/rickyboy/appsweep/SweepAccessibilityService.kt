@@ -436,6 +436,66 @@ class SweepAccessibilityService : AccessibilityService() {
         return true
     }
 
+    /**
+     * Switches on Developer options for the user: opens About phone, finds "Build number"
+     * (on Samsung it's inside Software information) and taps it until Android says
+     * "You are now a developer". If it asks for the PIN, the user types it in.
+     */
+    fun autoDeveloperOptions(onResult: (String?) -> Unit): Boolean {
+        if (busy) return false
+        busy = true
+        scope.launch {
+            val error = try { runAutoDeveloperOptions() } catch (e: Exception) { "Something went wrong. Try again." }
+            withContext(Dispatchers.Main) {
+                repeat(3) { performGlobalAction(GLOBAL_ACTION_BACK); delay(300) }
+                startActivity(
+                    Intent(this@SweepAccessibilityService, MainActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                )
+                onResult(error)
+            }
+            busy = false
+        }
+        return true
+    }
+
+    private val buildNumberTexts = listOf(
+        "Build number", "Build Number", "MIUI version", "HyperOS version", "OS version",
+        "ColorOS version", "Software version", "EMUI version"
+    )
+    private val softwareInfoTexts = listOf("Software information", "Software info", "Version", "Android version")
+
+    private suspend fun runAutoDeveloperOptions(): String? {
+        if (Adb.developerOptionsOn(applicationContext)) return null
+        withContext(Dispatchers.Main) {
+            startActivity(Intent(Settings.ACTION_DEVICE_INFO_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+        delay(900)
+        var build = waitFor(2000) { find(buildNumberTexts) } ?: findWithScroll(buildNumberTexts, 20)
+        if (build == null) {
+            // Samsung and some others keep it one page deeper
+            val sw = find(softwareInfoTexts) ?: findWithScroll(softwareInfoTexts, 10)
+            if (sw != null) {
+                click(sw)
+                delay(900)
+                build = waitFor(2000) { find(buildNumberTexts) } ?: findWithScroll(buildNumberTexts, 10)
+            }
+        }
+        val target = build ?: return "Couldn't find \"Build number\". Open About phone and tap it 7 times yourself."
+        // tap it until Developer options come on (Android needs 7 taps)
+        for (i in 0 until 9) {
+            if (Adb.developerOptionsOn(applicationContext)) break
+            click(target)
+            delay(220)
+        }
+        // a PIN / pattern check may pop up: give the user time to enter it
+        for (i in 0 until 60) {
+            if (Adb.developerOptionsOn(applicationContext)) return null
+            delay(500)
+        }
+        return "Developer options didn't switch on. If your phone asked for your PIN, enter it, then try again."
+    }
+
     private suspend fun runAutoPair(): String? {
         if (!onWifi()) return "Connect to Wi-Fi first: pairing works over Wi-Fi."
         status("Opening Developer options…")

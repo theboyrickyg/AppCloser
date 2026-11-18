@@ -699,11 +699,16 @@ class MainActivity : AppCompatActivity() {
             stepText(
                 "RAPID TOTAL CLEAN SETUP · STEP 2 OF 2\n",
                 if (SweepAccessibilityService.isOn()) "Step 1 done ✓\n\n" else "\n",
-                "1. Tap ", Pair("  About phone  ", { openSettings(Settings.ACTION_DEVICE_INFO_SETTINGS) }), "\n",
-                "2. Tap \"Build number\" 7 times until it says you're a developer ",
-                "(on some phones it's under Software information). Enter your PIN if asked.\n",
-                "3. Press Back to return here.\n",
-                "4. Make sure you're on Wi-Fi, then tap ", pairWord, warn
+                "First, Developer options need switching on (a hidden Android setting):\n\n",
+                "1. Tap ", Pair("  Switch on Developer options  ", { startAutoDeveloperOptions() }), "\n",
+                "App Closer opens About phone and taps \"Build number\" 7 times for you. ",
+                "If your phone asks for your PIN, enter it.\n\n",
+                "2. When you're back here, make sure you're on Wi-Fi, then tap ", pairWord, warn,
+                "\n\nIf the automatic switch doesn't work: tap ",
+                Pair("  About phone  ", { openSettings(Settings.ACTION_DEVICE_INFO_SETTINGS) }),
+                " and tap \"Build number\" 7 times yourself, until it says you're a developer. ",
+                "Samsung: it's under Software information. Xiaomi: tap \"OS version\" or \"MIUI version\". ",
+                "Then press Back to return here."
             )
         }
         // the warning in bold red
@@ -721,16 +726,37 @@ class MainActivity : AppCompatActivity() {
         codeRow.visibility = View.GONE
     }
 
-    private fun developerOptionsOn(): Boolean = try {
-        Settings.Global.getInt(contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
-    } catch (_: Exception) {
-        true
+    private fun developerOptionsOn(): Boolean = Adb.developerOptionsOn(this)
+
+    /** App Closer taps "Build number" 7 times for the user. */
+    private fun startAutoDeveloperOptions() {
+        if (developerOptionsOn()) {
+            toast("Developer options are already on ✓")
+            checkConnection(userAsked = false)
+            return
+        }
+        if (!SweepAccessibilityService.isOn()) {
+            // it needs App Closer allowed in Accessibility to do the tapping: step 1 first
+            pairHelper = true
+            easyStep = 1
+            showEasySetup()
+            scrollToTop(statusCard)
+            return
+        }
+        val svc = SweepAccessibilityService.instance ?: return
+        toast("Tapping Build number for you… enter your PIN if asked")
+        val started = svc.autoDeveloperOptions { error ->
+            if (error == null) toast("Developer options are on ✓ Now tap Pair automatically")
+            else toast(error)
+            checkConnection(userAsked = false)
+        }
+        if (!started) toast("App Closer is busy. Try again in a moment.")
     }
 
     /** Finds the code and pairs, with App Closer doing the tapping. */
     private fun startAutoPair() {
         if (!developerOptionsOn()) {
-            toast("Switch on Developer options first (steps 1–3)")
+            toast("Switch on Developer options first (step 1 above)")
             return
         }
         if (!SweepAccessibilityService.isOn()) {
