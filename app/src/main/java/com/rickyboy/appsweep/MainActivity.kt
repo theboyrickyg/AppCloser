@@ -44,6 +44,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var appsCountText: TextView
     private lateinit var statusCard: LinearLayout
     private lateinit var statusText: TextView
+    private lateinit var statusText2: TextView
+    private lateinit var choiceBox: View
+    private lateinit var stepImage: View
     private lateinit var statusButton: Button
     private lateinit var statusButton2: Button
     private lateinit var codeRow: LinearLayout
@@ -128,6 +131,14 @@ class MainActivity : AppCompatActivity() {
         appsCountText = findViewById(R.id.appsCountText)
         statusCard = findViewById(R.id.statusCard)
         statusText = findViewById(R.id.statusText)
+        statusText2 = findViewById(R.id.statusText2)
+        choiceBox = findViewById(R.id.choiceBox)
+        stepImage = findViewById(R.id.stepImage)
+        // words in the setup steps that are buttons themselves
+        statusText.movementMethod = android.text.method.LinkMovementMethod.getInstance()
+        statusText.highlightColor = android.graphics.Color.TRANSPARENT
+        statusText2.movementMethod = android.text.method.LinkMovementMethod.getInstance()
+        statusText2.highlightColor = android.graphics.Color.TRANSPARENT
         statusButton = findViewById(R.id.statusButton)
         statusButton2 = findViewById(R.id.statusButton2)
         codeRow = findViewById(R.id.codeRow)
@@ -253,6 +264,9 @@ class MainActivity : AppCompatActivity() {
         if (awaitingStep > 0 && (setupChoice == "easy" || pairHelper) && !SweepAccessibilityService.isEnabledInSettings(this)) {
             easyStep = awaitingStep
         }
+        if (awaitingStep == 0 && setupChoice == "easy" && !pairHelper && SweepAccessibilityService.isEnabledInSettings(this)) {
+            toast("Setup complete ✓")
+        }
         awaitingStep = -1
         if (guidedActive) {
             onGuidedReturn()
@@ -306,13 +320,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showStatus(status: Shell.Status) {
+        hideSetupExtras()
+        resetStatusTextStyle()
         val isReady = status == Shell.Status.READY
         // Normal mode running: offer Instant mode (or reconnecting it, if it was set up before)
         instantLink.visibility = if (!isTv && isReady && !Shell.isReady()) View.VISIBLE else View.GONE
         // TV guided closing (no Accessibility, no Instant mode) can't reach the Recents screen
         recentsSwitch.visibility =
             if (isReady && (!isTv || SweepAccessibilityService.isOn() || Shell.isReady())) View.VISIBLE else View.GONE
-        instantLink.text = if (setupChoice == "pro" && Adb.hasWorkedBefore(this)) "⚡ Reconnect Instant mode" else "⚡ Instant mode (advanced)"
+        instantLink.text = if (setupChoice == "pro" && Adb.hasWorkedBefore(this)) "⚡ Reconnect Rapid Total Clean" else "⚡ Rapid Total Clean (advanced)"
         statusCard.visibility = if (isReady) View.GONE else View.VISIBLE
         sweepButton.isEnabled = isReady && !busy
         sweepButton.alpha = if (isReady) 1f else 0.4f
@@ -325,8 +341,7 @@ class MainActivity : AppCompatActivity() {
         // People who already set up Pro (before Easy existed) carry on with Pro
         val choice = setupChoice ?: if (Adb.hasWorkedBefore(this) || Adb.hasPaired(this)) "pro" else null
         if (!isReady && status != Shell.Status.CONNECTING && choice != "pro") {
-            if (choice == null && !isTv) setupChoice = "easy"
-            if (choice == "easy" || (choice == null && !isTv)) showEasySetup() else showChoice()
+            if (choice == "easy") showEasySetup() else showChoice()
             clearList()
             return
         }
@@ -342,7 +357,7 @@ class MainActivity : AppCompatActivity() {
         }
         if (!isReady) {
             linkButton.visibility = View.VISIBLE
-            linkButton.text = "← Back to normal mode"
+            linkButton.text = if (SweepAccessibilityService.isOn()) "← Back to Basic Clean" else "← Back to choose your Clean"
             linkButton.setOnClickListener { leaveInstantSetup() }
         }
 
@@ -436,29 +451,97 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** First screen: Easy (one switch) or Pro (debugging). */
+    /** Hides the parts of the card only some setup screens use. */
+    private fun hideSetupExtras() {
+        choiceBox.visibility = View.GONE
+        stepImage.visibility = View.GONE
+        statusText2.visibility = View.GONE
+    }
+
+    /** First screen after installing: Basic Clean or Rapid Total Clean. */
     private fun showChoice() {
         statusCard.visibility = View.VISIBLE
-        statusText.text = "Welcome! Choose how to set up App Closer:\n\n" +
-            "EASY (recommended)\nTwo quick steps in Settings, shown one at a time. No codes, nothing technical. " +
-            "Closing apps takes a few seconds each, with a progress screen while it works.\n\n" +
-            "PRO\nFor confident users. Uses Developer options. Closes everything instantly and silently, " +
-            "shows RAM and CPU for every app, clears all caches at once and can block apps auto-starting."
-        statusButton.visibility = View.VISIBLE
-        statusButton.text = "Easy setup"
-        statusButton.setOnClickListener {
-            setupChoice = "easy"
-            easyStep = 1
-            showEasySetup()
-        }
-        statusButton2.visibility = View.VISIBLE
-        statusButton2.text = "Pro setup"
-        statusButton2.setOnClickListener {
-            setupChoice = "pro"
-            checkConnection(userAsked = false)
-        }
+        hideSetupExtras()
+        statusText.text = colored("Please select your Clean", 0)
+        statusText.textSize = 20f
+        statusText.gravity = android.view.Gravity.CENTER
+        statusButton.visibility = View.GONE
+        statusButton2.visibility = View.GONE
         codeRow.visibility = View.GONE
         linkButton.visibility = View.GONE
-        statusButton.requestFocus()
+        choiceBox.visibility = View.VISIBLE
+
+        val basic = findViewById<Button>(R.id.basicButton)
+        val rapid = findViewById<SpeedButton>(R.id.rapidButton)
+        basic.text = choiceLabel("BASIC CLEAN", "average user")
+        rapid.text = choiceLabel("RAPID TOTAL CLEAN", "confident user")
+        findViewById<TextView>(R.id.basicDesc).text =
+            "Closes your apps one by one through Android's own settings while the ram does the work. " +
+                "Takes a few seconds per app. Quick 3-step setup, nothing technical."
+        findViewById<TextView>(R.id.rapidDesc).text =
+            "Closes every app at once in a couple of seconds, silently, and clears all caches together. " +
+                "Uses Developer options and Wireless debugging. App Closer finds and enters the pairing code for you."
+        basic.setOnClickListener {
+            setupChoice = "easy"
+            easyStep = 1
+            resetStatusTextStyle()
+            showEasySetup()
+            scrollToTop(statusCard)
+        }
+        rapid.setOnClickListener {
+            if (!Unlock.isUnlocked(this)) {
+                showUnlock()
+                return@setOnClickListener
+            }
+            setupChoice = "pro"
+            resetStatusTextStyle()
+            hideSetupExtras()
+            checkConnection(userAsked = false)
+            scrollToTop(statusCard)
+        }
+        basic.requestFocus()
+    }
+
+    private fun resetStatusTextStyle() {
+        statusText.textSize = 15f
+        statusText.gravity = android.view.Gravity.START
+    }
+
+    /** Big bold name, small dim "(who it's for)" underneath. */
+    private fun choiceLabel(name: String, who: String): CharSequence {
+        val sb = android.text.SpannableStringBuilder()
+        sb.append(name, android.text.style.StyleSpan(android.graphics.Typeface.BOLD), 0)
+        sb.setSpan(android.text.style.RelativeSizeSpan(1.25f), 0, name.length, 0)
+        val s0 = sb.length
+        sb.append("\n($who)")
+        sb.setSpan(android.text.style.RelativeSizeSpan(0.85f), s0, sb.length, 0)
+        sb.setSpan(android.text.style.ForegroundColorSpan(getColor(R.color.text_dim)), s0, sb.length, 0)
+        return sb
+    }
+
+    /**
+     * Builds step text where some words are buttons: pass plain strings, and
+     * Pair("Accessibility") { … } for a tappable word drawn as a pill.
+     */
+    private fun stepText(vararg parts: Any): CharSequence {
+        val sb = android.text.SpannableStringBuilder()
+        for (part in parts) {
+            if (part is Pair<*, *>) {
+                val word = part.first as String
+                @Suppress("UNCHECKED_CAST") val action = part.second as () -> Unit
+                val st = sb.length
+                sb.append(word)
+                sb.setSpan(PillSpan(getColor(R.color.accent_red), android.graphics.Color.WHITE, resources.displayMetrics.density),
+                    st, sb.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                sb.setSpan(object : android.text.style.ClickableSpan() {
+                    override fun onClick(widget: View) = action()
+                    override fun updateDrawState(ds: android.text.TextPaint) {}
+                }, st, sb.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            } else {
+                sb.append(part.toString())
+            }
+        }
+        return sb
     }
 
     /** Easy setup: switch on the accessibility service. */
@@ -501,8 +584,10 @@ class MainActivity : AppCompatActivity() {
      * that order: try → unlock → switch on.
      */
     private fun showEasySetup() {
-        val title = if (pairHelper) "INSTANT MODE · TURN ON AUTO-PAIRING" else "SETUP"
+        val title = if (pairHelper) "RAPID TOTAL CLEAN · TURN ON AUTO-PAIRING" else "BASIC CLEAN SETUP"
         statusCard.visibility = View.VISIBLE
+        hideSetupExtras()
+        resetStatusTextStyle()
         codeRow.visibility = View.GONE
         statusButton.visibility = View.VISIBLE
         statusButton2.visibility = View.GONE
@@ -521,37 +606,40 @@ class MainActivity : AppCompatActivity() {
         if (needsUnlock && restrictedSettingsAllowed() == true && easyStep < 3) easyStep = 3
         val step = if (needsUnlock) easyStep.coerceIn(1, 3) else 3
 
+        val openAccessibility: () -> Unit = {
+            awaitingStep = if (step == 1) 2 else 0
+            openAccessibilitySettings()
+        }
         when (step) {
             1 -> {
-                statusText.text = "$title · STEP 1 OF 3\nTry to switch on App Closer\n\n" +
-                    "Android blocks this the first time. That's expected, and it unlocks the next step.\n\n" +
-                    "1. Tap \"Go to Accessibility\" below.\n" +
-                    "2. Tap App Closer (under Downloaded apps).\n" +
-                    "3. A \"Restricted setting\" message appears. Tap OK.\n" +
-                    "4. Press Back to return here."
-                statusButton.text = "Go to Accessibility"
-                statusButton.setOnClickListener {
-                    awaitingStep = 2
-                    openAccessibilitySettings()
-                }
+                statusText.text = stepText(
+                    "$title · STEP 1 OF 3\n\n",
+                    "1. Tap ", Pair("  Accessibility  ", openAccessibility), "\n",
+                    "2. Tap \"App Closer\" even though it is greyed out. It looks like this:"
+                )
+                stepImage.visibility = View.VISIBLE
+                statusText2.visibility = View.VISIBLE
+                statusText2.text = "Tap it anyway. Access will be denied: tap Close.\n\n" +
+                    "Press Back to return here."
+                statusButton.visibility = View.GONE
                 statusButton2.visibility = View.VISIBLE
                 statusButton2.text = "Next step →"
                 statusButton2.setOnClickListener { goEasyStep(2) }
                 backToChoiceOrPairing()
             }
             2 -> {
-                statusText.text = "$title · STEP 2 OF 3\nAllow restricted settings\n\n" +
-                    "1. Tap \"Open App info\" below.\n" +
-                    "2. Tap the three dots ⋮ in the TOP RIGHT corner.\n" +
-                    "3. Tap \"Allow restricted settings\".\n" +
-                    "4. Enter your PIN or fingerprint if asked.\n" +
-                    "5. Press Back to return here.\n\n" +
-                    "No three dots? Go back and do step 1 first."
-                statusButton.text = "Open App info"
-                statusButton.setOnClickListener {
-                    awaitingStep = 3
-                    openSettingsUri(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:$packageName")
-                }
+                statusText.text = stepText(
+                    "$title · STEP 2 OF 3\n\n",
+                    "1. Tap ", Pair("  Open app info  ", {
+                        awaitingStep = 3
+                        openSettingsUri(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:$packageName")
+                    }), "\n",
+                    "2. Tap the 3 dots ⋮ in the top right corner.\n",
+                    "3. Tap \"Allow restricted settings\".\n",
+                    "4. Enter your PIN or fingerprint if asked.\n\n",
+                    "Press Back to return here."
+                )
+                statusButton.visibility = View.GONE
                 statusButton2.visibility = View.VISIBLE
                 statusButton2.text = "Next step →"
                 statusButton2.setOnClickListener { goEasyStep(3) }
@@ -559,20 +647,15 @@ class MainActivity : AppCompatActivity() {
                 linkButton.setOnClickListener { goEasyStep(1) }
             }
             else -> {
-                statusText.text = (if (needsUnlock) "$title · STEP 3 OF 3\n" else "$title\n") +
-                    "Switch on App Closer\n\n" +
-                    "1. Tap \"Go to Accessibility\" below.\n" +
-                    (if (isTv) "2. Choose App Closer (under Services or Downloaded services).\n" +
-                        "3. Switch it on and choose OK.\n"
-                    else "2. Tap App Closer (under Downloaded apps).\n" +
-                        "3. Turn on \"Use App Closer\" and tap Allow.\n") +
-                    (if (pairHelper) "4. Press Back to return here. App Closer then pairs by itself."
-                    else "4. Press Back to return here. You're done!")
-                statusButton.text = "Go to Accessibility"
-                statusButton.setOnClickListener {
-                    awaitingStep = 0
-                    openAccessibilitySettings()
-                }
+                statusText.text = stepText(
+                    if (needsUnlock) "$title · STEP 3 OF 3\n\n" else "$title\n\n",
+                    "1. Tap ", Pair("  Accessibility  ", openAccessibility), if (needsUnlock) " again\n" else "\n",
+                    if (isTv) "2. Choose App Closer (under Services or Downloaded services).\n3. Switch it on and choose OK.\n"
+                    else "2. Tap App Closer (under Downloaded apps).\n3. Turn on \"Use App Closer\" and tap Allow.\n",
+                    if (pairHelper) "4. Press Back to return here. App Closer then pairs by itself."
+                    else "4. Press Back to return here. Setup is then complete."
+                )
+                statusButton.visibility = View.GONE
                 if (needsUnlock) {
                     linkButton.text = "← Back to step 2"
                     linkButton.setOnClickListener { goEasyStep(2) }
@@ -581,7 +664,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        statusButton.requestFocus()
+        statusButton2.requestFocus()
     }
 
     private fun backToChoiceOrPairing() {
@@ -592,7 +675,12 @@ class MainActivity : AppCompatActivity() {
                 checkConnection(userAsked = false)
             }
         } else {
-            linkButton.visibility = View.GONE   // only one way to set up now
+            linkButton.visibility = View.VISIBLE
+            linkButton.text = "← Back to choose your Clean"
+            linkButton.setOnClickListener {
+                setupChoice = null
+                showChoice()
+            }
         }
     }
 
@@ -1131,14 +1219,14 @@ class MainActivity : AppCompatActivity() {
             return
         }
         AlertDialog.Builder(this)
-            .setTitle("⚡ Instant mode")
+            .setTitle("⚡ Rapid Total Clean")
             .setMessage(
                 "Closes everything at once in a couple of seconds, silently, with no Settings pages opening. " +
                     "It also shows RAM for every app and clears all caches at once.\n\n" +
                     "It's for confident users: it uses Android's Developer options and Wireless debugging. " +
                     "App Closer finds and enters the pairing code for you.\n\n" +
                     "After a phone restart you may need to switch Wireless debugging back on. " +
-                    "Normal mode still works whenever Instant mode isn't connected."
+                    "Basic Clean still works whenever Rapid Total Clean isn't connected."
             )
             .setPositiveButton("Set it up") { _, _ ->
                 setupChoice = "pro"
@@ -1157,9 +1245,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun leaveInstantSetup() {
-        setupChoice = "easy"
         pairHelper = false
-        checkConnection(userAsked = false)
+        if (SweepAccessibilityService.isOn()) {
+            setupChoice = "easy"
+            checkConnection(userAsked = false)
+        } else {
+            setupChoice = null
+            hideSetupExtras()
+            showChoice()
+        }
     }
 
     private fun setOwnRecentsHidden(hidden: Boolean) {

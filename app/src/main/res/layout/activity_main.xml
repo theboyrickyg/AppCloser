@@ -32,8 +32,126 @@
             android:id="@+id/statusText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:lineSpacingExtra="8dp"
             android:textColor="@color/text_main"
             android:textSize="15sp" />
+
+        <!-- First screen: choose Basic Clean or Rapid Total Clean -->
+        <LinearLayout
+            android:id="@+id/choiceBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <Button
+                android:id="@+id/basicButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:background="@drawable/bg_small_button"
+                android:minHeight="72dp"
+                android:paddingTop="10dp"
+                android:paddingBottom="10dp"
+                android:stateListAnimator="@null"
+                android:textAllCaps="false"
+                android:textColor="@color/text_main" />
+
+            <TextView
+                android:id="@+id/basicDesc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:textColor="@color/text_dim"
+                android:textSize="14sp" />
+
+            <com.rickyboy.appsweep.SpeedButton
+                android:id="@+id/rapidButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:background="@drawable/bg_small_button"
+                android:minHeight="72dp"
+                android:paddingTop="10dp"
+                android:paddingBottom="10dp"
+                android:stateListAnimator="@null"
+                android:textAllCaps="false"
+                android:textColor="@color/text_main" />
+
+            <TextView
+                android:id="@+id/rapidDesc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:textColor="@color/text_dim"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <!-- Setup step 1: what App Closer looks like in Accessibility while it's still blocked -->
+        <LinearLayout
+            android:id="@+id/stepImage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="4dp"
+            android:background="@drawable/bg_settings_mock"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingTop="14dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="14dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:alpha="0.45"
+                android:contentDescription="App Closer icon"
+                android:src="@mipmap/ic_launcher" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="App Closer"
+                    android:textColor="#80FFFFFF"
+                    android:textSize="17sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Controlled by Restricted Setting"
+                    android:textColor="#66FFFFFF"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="👆"
+                android:textSize="24sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/statusText2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:lineSpacingExtra="8dp"
+            android:textColor="@color/text_main"
+            android:textSize="15sp"
+            android:visibility="gone" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -402,7 +520,7 @@
         android:textSize="15sp"
         android:visibility="gone" />
 
-    <!-- Instant mode (Developer options) is tucked away here for confident users -->
+    <!-- Rapid Total Clean (Developer options) is tucked away here for confident users -->
     <Button
         android:id="@+id/instantLink"
         style="?android:attr/borderlessButtonStyle"
@@ -410,7 +528,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
         android:layout_marginBottom="16dp"
-        android:text="⚡ Instant mode (advanced)"
+        android:text="⚡ Rapid Total Clean (advanced)"
         android:textAllCaps="false"
         android:textColor="@color/text_dim"
         android:textSize="14sp"

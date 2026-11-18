@@ -45,7 +45,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:lineSpacingExtra="6dp"
-            android:text="✓  Close All &amp; Clear Cache, unlimited\n✓  Quick Sweep tile and shortcut\n✓  Stop apps auto-starting\n✓  ⚡ Instant mode: closes everything in seconds\n✓  Works on your phone and TV\n✓  One payment. No subscription, no ads"
+            android:text="✓  Close All &amp; Clear Cache, unlimited\n✓  Quick Sweep tile and shortcut\n✓  Stop apps auto-starting\n✓  ⚡ Rapid Total Clean: closes everything in seconds\n✓  Works on your phone and TV\n✓  One payment. No subscription, no ads"
             android:textColor="@color/text_main"
             android:textSize="15sp" />
 
