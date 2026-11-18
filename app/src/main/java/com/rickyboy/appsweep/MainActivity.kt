@@ -347,8 +347,7 @@ class MainActivity : AppCompatActivity() {
         }
         if (!isReady && status != Shell.Status.CONNECTING && pairHelper && !isTv) {
             if (SweepAccessibilityService.isOn()) {
-                pairHelper = false
-                autoPairNow = true          // switched on: go straight into automatic pairing
+                pairHelper = false          // step 1 done: on to step 2
             } else {
                 showEasySetup()
                 clearList()
@@ -370,20 +369,12 @@ class MainActivity : AppCompatActivity() {
                         "until it says you're a developer. Then come back here."
                     statusButton.text = "Open Settings"
                     statusButton.setOnClickListener { openSettings(Settings.ACTION_DEVICE_INFO_SETTINGS) }
+                    statusButton2.visibility = View.VISIBLE
+                    statusButton2.text = "Next step →"
+                    statusButton2.setOnClickListener { checkConnection(userAsked = false) }
                 } else {
-                    statusText.text = stepText(
-                        "RAPID TOTAL CLEAN SETUP · STEP 1 OF 2\n\n",
-                        "1. Tap ", Pair("  About phone  ", { openSettings(Settings.ACTION_DEVICE_INFO_SETTINGS) }), "\n",
-                        "2. Tap \"Build number\" 7 times until it says you're a developer ",
-                        "(on some phones it's under Software information).\n",
-                        "3. Enter your PIN if asked.\n\n",
-                        "Press Back to return here."
-                    )
-                    statusButton.visibility = View.GONE
+                    showRapidStep2(devOptionsOn = false)
                 }
-                statusButton2.visibility = View.VISIBLE
-                statusButton2.text = "Next step →"
-                statusButton2.setOnClickListener { checkConnection(userAsked = false) }
             }
             Shell.Status.NEED_DEBUGGING, Shell.Status.NEED_PAIRING -> {
                 if (isTv) {
@@ -416,26 +407,7 @@ class MainActivity : AppCompatActivity() {
                     statusButton2.text = "Connect"
                     statusButton2.setOnClickListener { checkConnection(userAsked = true) }
                 } else {
-                    statusText.text = android.text.SpannableStringBuilder().apply {
-                        append("RAPID TOTAL CLEAN SETUP · STEP 2 OF 2\n\n")
-                        append("Tap \"★ Pair automatically\". App Closer switches on Wireless debugging (you need Wi-Fi), " +
-                            "finds the 6-digit code and enters it for you.\n\n")
-                        val st = length
-                        append("✋ DON'T TOUCH THE SCREEN while it pairs.\nIt takes about 10 seconds and App Closer does all the tapping. " +
-                            "Touching the screen can stop it working.")
-                        setSpan(android.text.style.ForegroundColorSpan(getColor(R.color.accent_red)), st, length, 0)
-                        setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), st, length, 0)
-                        if (!SweepAccessibilityService.isOn())
-                            append("\n\nThe first time, it asks you to switch App Closer on in Accessibility. One time only.")
-                    }
-                    statusText2.visibility = View.VISIBLE
-                    statusText2.text = "Doing it yourself: Developer options → switch on Wireless debugging → " +
-                        "\"Pair device with pairing code\". Pull down your notifications and type the 6-digit code " +
-                        "into the App Closer notification."
-                    statusButton.text = "★ Pair automatically"
-                    statusButton2.visibility = View.VISIBLE
-                    statusButton2.text = "Enter the code myself"
-                    offerAutoPair()
+                    showRapidStep2(devOptionsOn = true)
                 }
             }
             Shell.Status.CONNECTING -> {
@@ -504,7 +476,14 @@ class MainActivity : AppCompatActivity() {
             setupChoice = "pro"
             resetStatusTextStyle()
             hideSetupExtras()
-            checkConnection(userAsked = false)
+            if (!isTv && !SweepAccessibilityService.isOn()) {
+                // Rapid step 1 of 2: allow App Closer (it needs this to pair by itself)
+                pairHelper = true
+                easyStep = 1
+                showEasySetup()
+            } else {
+                checkConnection(userAsked = false)
+            }
             scrollToTop(statusCard)
         }
         basic.requestFocus()
@@ -575,7 +554,6 @@ class MainActivity : AppCompatActivity() {
     private var pairHelper: Boolean
         get() = prefs.getBoolean("pair_helper", false)
         set(v) { prefs.edit().putBoolean("pair_helper", v).apply() }
-    private var autoPairNow = false
 
     private var easyStep: Int
         get() = prefs.getInt("easy_step", 1)
@@ -592,7 +570,7 @@ class MainActivity : AppCompatActivity() {
      * that order: try → unlock → switch on.
      */
     private fun showEasySetup() {
-        val title = if (pairHelper) "RAPID SETUP · STEP 2 OF 2\nSwitch on auto-pairing (after this, don't touch the screen while it pairs)" else "BASIC CLEAN SETUP"
+        val title = if (pairHelper) "RAPID TOTAL CLEAN SETUP · STEP 1 OF 2\nAllow App Closer" else "BASIC CLEAN SETUP"
         val word = if (pairHelper) "PART" else "STEP"
         statusCard.visibility = View.VISIBLE
         hideSetupExtras()
@@ -661,7 +639,7 @@ class MainActivity : AppCompatActivity() {
                     "1. Tap ", Pair("  Accessibility  ", openAccessibility), if (needsUnlock) " again\n" else "\n",
                     if (isTv) "2. Choose App Closer (under Services or Downloaded services).\n3. Switch it on and choose OK.\n"
                     else "2. Tap App Closer (under Downloaded apps).\n3. Turn on \"Use App Closer\" and tap Allow.\n",
-                    if (pairHelper) "4. Press Back to return here. App Closer then pairs by itself."
+                    if (pairHelper) "4. Press Back to return here for step 2."
                     else "4. Press Back to return here. Setup is then complete."
                 )
                 statusButton.visibility = View.GONE
@@ -678,10 +656,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun backToChoiceOrPairing() {
         if (pairHelper) {
-            linkButton.text = "← Back to pairing"
+            linkButton.text = "← Back to choose your Clean"
             linkButton.setOnClickListener {
                 pairHelper = false
-                checkConnection(userAsked = false)
+                setupChoice = null
+                showChoice()
             }
         } else {
             linkButton.visibility = View.VISIBLE
@@ -707,37 +686,76 @@ class MainActivity : AppCompatActivity() {
      * Phones: if App Closer's Accessibility switch is on, it can open Wireless debugging, read the
      * 6-digit code and pair by itself.
      */
-    private fun offerAutoPair() {
-        // automatic pairing becomes the main button; doing it by hand is the second
+    /**
+     * Rapid step 2 of 2, kept as simple as the Accessibility steps: switch on Developer options
+     * (only if they're off), then one tap to pair.
+     */
+    private fun showRapidStep2(devOptionsOn: Boolean) {
+        val pairWord = Pair("  Pair automatically  ", { startAutoPair() })
+        val warn = "\n\n✋ DON'T TOUCH THE SCREEN while it pairs (about 10 seconds). App Closer does all the tapping."
+        val text = if (devOptionsOn) {
+            stepText(
+                "RAPID TOTAL CLEAN SETUP · STEP 2 OF 2\n",
+                if (SweepAccessibilityService.isOn()) "Step 1 done ✓\n\n" else "\n",
+                "1. Make sure you're on Wi-Fi.\n",
+                "2. Tap ", pairWord, warn
+            )
+        } else {
+            stepText(
+                "RAPID TOTAL CLEAN SETUP · STEP 2 OF 2\n",
+                if (SweepAccessibilityService.isOn()) "Step 1 done ✓\n\n" else "\n",
+                "1. Tap ", Pair("  About phone  ", { openSettings(Settings.ACTION_DEVICE_INFO_SETTINGS) }), "\n",
+                "2. Tap \"Build number\" 7 times until it says you're a developer ",
+                "(on some phones it's under Software information). Enter your PIN if asked.\n",
+                "3. Press Back to return here.\n",
+                "4. Make sure you're on Wi-Fi, then tap ", pairWord, warn
+            )
+        }
+        // the warning in bold red
+        val sb = android.text.SpannableStringBuilder(text)
+        val at = sb.indexOf("✋")
+        if (at >= 0) {
+            sb.setSpan(android.text.style.ForegroundColorSpan(getColor(R.color.accent_red)), at, sb.length, 0)
+            sb.setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), at, sb.length, 0)
+        }
+        statusText.text = sb
+        statusButton.visibility = View.GONE
         statusButton2.visibility = View.VISIBLE
-        statusButton2.text = "Enter the code myself"
+        statusButton2.text = "Enter the code myself instead"
         statusButton2.setOnClickListener { startPhonePairing() }
-        statusButton.text = "★ Pair automatically"
-        statusButton.setOnClickListener {
-            if (!SweepAccessibilityService.isOn()) {
-                // needs App Closer's Accessibility switch to read the code: switch it on first
-                pairHelper = true
-                easyStep = 1
-                showEasySetup()
-                return@setOnClickListener
-            }
-            val svc = SweepAccessibilityService.instance ?: return@setOnClickListener
-            toast("Pairing… please don't touch the screen")
-            val started = svc.autoPair { error ->
-                if (error == null) {
-                    toast("Paired ✓ Connecting…")
-                    checkConnection(userAsked = true)
-                } else {
-                    toast(error)
-                }
-            }
-            if (!started) toast("App Closer is busy. Try again in a moment.")
+        codeRow.visibility = View.GONE
+    }
+
+    private fun developerOptionsOn(): Boolean = try {
+        Settings.Global.getInt(contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
+    } catch (_: Exception) {
+        true
+    }
+
+    /** Finds the code and pairs, with App Closer doing the tapping. */
+    private fun startAutoPair() {
+        if (!developerOptionsOn()) {
+            toast("Switch on Developer options first (steps 1–3)")
+            return
         }
-        statusButton.requestFocus()
-        if (autoPairNow) {
-            autoPairNow = false
-            statusButton.postDelayed({ if (!isFinishing) statusButton.performClick() }, 700)
+        if (!SweepAccessibilityService.isOn()) {
+            // it needs App Closer allowed in Accessibility to read the code: do step 1 first
+            pairHelper = true
+            easyStep = 1
+            showEasySetup()
+            scrollToTop(statusCard)
+            return
         }
+        val svc = SweepAccessibilityService.instance ?: return
+        val started = svc.autoPair { error ->
+            if (error == null) {
+                toast("Paired ✓ Connecting…")
+                checkConnection(userAsked = true)
+            } else {
+                toast(error)
+            }
+        }
+        if (!started) toast("App Closer is busy. Try again in a moment.")
     }
 
     private fun startPhonePairing() {
