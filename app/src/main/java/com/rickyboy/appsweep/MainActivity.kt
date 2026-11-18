@@ -480,7 +480,7 @@ class MainActivity : AppCompatActivity() {
                 "Takes a few seconds per app. Quick 3-step setup, nothing technical."
         findViewById<TextView>(R.id.rapidDesc).text =
             "Closes every app at once in a couple of seconds, silently, and clears all caches together. " +
-                "Uses Developer options and Wireless debugging. App Closer finds and enters the pairing code for you."
+                "Uses Developer options and Wireless debugging. More advanced setup, but a rapid, in-depth total clean."
         basic.setOnClickListener {
             setupChoice = "easy"
             easyStep = 1
