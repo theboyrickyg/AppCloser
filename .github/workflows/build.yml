@@ -1,4 +1,4 @@
-name: Build Background App Sweep APK
+name: Build App Closer APK
 
 on:
   workflow_dispatch:
@@ -42,17 +42,17 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           gradle assembleRelease --no-daemon
-                   cp app/build/outputs/apk/release/app-release.apk BackgroundAppSweep.apk
+                   cp app/build/outputs/apk/release/app-release.apk AppCloser.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: BackgroundAppSweep
-          path: BackgroundAppSweep.apk
+          name: AppCloser
+          path: AppCloser.apk
 
       - name: Publish to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: Background App Sweep 1.0.${{ github.run_number }}
-          files: BackgroundAppSweep.apk
+          name: App Closer 1.0.${{ github.run_number }}
+          files: AppCloser.apk
           make_latest: true
