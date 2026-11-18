@@ -29,6 +29,21 @@ class RapidCleanView @JvmOverloads constructor(
     private val img = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
     private val t = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
     private val r = RectF()
+    private val sweepPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG).apply {
+        xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.ADD)
+    }
+    private val hotBitmapShader = android.graphics.BitmapShader(
+        BitmapFactory.decodeResource(resources, R.drawable.horns_hot_only, BitmapFactory.Options().apply { inScaled = false }),
+        android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP)
+    private val shaderMatrix = android.graphics.Matrix()
+
+    /** The glowing-horn picture as a paint, placed where the ram is drawn. */
+    private fun hotShader(s: Float, ox: Float, oy: Float): android.graphics.Shader {
+        shaderMatrix.setScale(s, s)
+        shaderMatrix.postTranslate(ox, oy)
+        hotBitmapShader.setLocalMatrix(shaderMatrix)
+        return hotBitmapShader
+    }
     private val start = SystemClock.uptimeMillis()
 
     /** How long the clean took, in seconds. */
@@ -55,17 +70,40 @@ class RapidCleanView @JvmOverloads constructor(
         val ox = (w - ram.width * s) / 2
         val oy = w * 0.07f
         val heat = (since / 700f).coerceAtMost(1f)            // horns warm up as he appears
-        val pulse = 0.82f + 0.18f * sin(now / 260f)
+        // fire-like flicker: a few uneven waves added together
+        val flicker = (0.78f + 0.10f * sin(now / 170f) + 0.07f * sin(now / 61f + 1.3f) + 0.05f * sin(now / 23f + 0.4f))
+            .coerceIn(0f, 1f)
         val pad = (halo.width - ram.width) / 2f
-        img.alpha = (heat * pulse * 255).toInt().coerceIn(0, 255)
-        r.set(ox - pad * s, oy - pad * s, ox + (ram.width + pad) * s, oy + (ram.height + pad) * s)
+        // the halo breathes in and out as well as flickering
+        val grow = 1f + 0.05f * sin(now / 420f)
+        val cx = ox + ram.width * s / 2
+        val cy = oy + ram.height * s / 2
+        val hw = (ram.width / 2f + pad) * s * grow
+        val hh = (ram.height / 2f + pad) * s * grow
+        img.alpha = (heat * flicker * 255).toInt().coerceIn(0, 255)
+        r.set(cx - hw, cy - hh, cx + hw, cy + hh)
         canvas.drawBitmap(halo, null, r, img)
         r.set(ox, oy, ox + ram.width * s, oy + ram.height * s)
         img.alpha = 255
         canvas.drawBitmap(ram, null, r, img)
-        img.alpha = (heat * (0.75f + 0.25f * pulse) * 255).toInt().coerceIn(0, 255)
+        img.alpha = (heat * (0.65f + 0.30f * flicker) * 255).toInt().coerceIn(0, 255)
         canvas.drawBitmap(hot, null, r, img)
         img.alpha = 255
+
+        // bright bands of heat sweeping across the horns, like embers glowing hotter and cooler
+        if (heat > 0f) {
+            val band = (now % 1800L) / 1800f
+            val bx = ox - ram.width * s * 0.3f + ram.width * s * 1.6f * band
+            sweepPaint.shader = android.graphics.ComposeShader(
+                hotShader(s, ox, oy),
+                android.graphics.LinearGradient(bx - w * 0.18f, oy, bx + w * 0.18f, oy + ram.height * s,
+                    intArrayOf(0x00FFFFFF, 0xFFFFFFFF.toInt(), 0x00FFFFFF), null, android.graphics.Shader.TileMode.CLAMP),
+                android.graphics.PorterDuff.Mode.DST_IN
+            )
+            sweepPaint.alpha = (heat * 150).toInt()
+            canvas.drawRect(r, sweepPaint)
+            sweepPaint.shader = null
+        }
         canvas.restore()
 
         // ALL CLEAN
