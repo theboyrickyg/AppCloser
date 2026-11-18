@@ -19,7 +19,7 @@ import kotlin.math.sin
 
 /**
  * The cleaning screen's moving picture: an app slides in, the ram pulls its head back,
- * then butts it with its horns. The app goes flying and smashes into pieces. Loops until
+ * then butts it with its horns. The app goes flying. Loops until
  * the view is removed.
  */
 class HeadbuttRamView @JvmOverloads constructor(
@@ -43,7 +43,6 @@ class HeadbuttRamView @JvmOverloads constructor(
     }
 
     private val head: Bitmap
-    private val shards: Bitmap
     private val hs: Float
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
     private val fx = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -69,7 +68,6 @@ class HeadbuttRamView @JvmOverloads constructor(
             inPreferredConfig = Bitmap.Config.ARGB_8888
         }
         head = BitmapFactory.decodeResource(resources, R.drawable.headbutt_ram, opts)
-        shards = BitmapFactory.decodeResource(resources, R.drawable.kick_shards, opts)
         hs = HEAD_H / head.height
         buildGlyphs()
         // where the horns end up at the moment of impact: the app waits there
@@ -130,19 +128,7 @@ class HeadbuttRamView @JvmOverloads constructor(
             val tremble = if (u > 0.40f) sin(u * 140f) * 4f else 0f
             drawIcon(canvas, which, x, waitY + sin(u * 9f) * 3f, tremble, 1f, 255)
         } else {
-            // smashed: pieces burst out from the hit, the app spins away and fades
-            if (k < 0.7f) {
-                val a = if (k < 0.1f) k / 0.1f else 1f - (k - 0.1f) / 0.6f
-                fx.alpha = (a.coerceIn(0f, 1f) * 255).toInt()
-                val sc = 0.45f + 0.55f * k
-                canvas.save()
-                canvas.translate(strike[0], strike[1])
-                canvas.scale(sc, sc)
-                canvas.translate(-RamArt.KICK_HOOF_X, -RamArt.KICK_HOOF_Y)
-                canvas.drawBitmap(shards, 0f, 0f, fx)
-                canvas.restore()
-                fx.alpha = 255
-            }
+            // hit: the app spins away and fades
             val x = waitX + 900f * k
             val y = waitY - 430f * k + 320f * k * k
             val alpha = if (k < 0.45f) 255 else (255 * (1f - (k - 0.45f) / 0.55f)).toInt()

@@ -30,13 +30,6 @@ object RamArt {
     const val CLEAN_BURST_X = 203f   // where the apps burst out of its head
     const val CLEAN_BURST_Y = 266f
 
-    // Kicking ram (cleaning screen): 900 x 540
-    const val KICK_W = 900
-    const val KICK_H = 540
-    const val KICK_HIP_X = 547.50f
-    const val KICK_HIP_Y = 258.75f
-    const val KICK_HOOF_X = 723.75f
-    const val KICK_HOOF_Y = 285.00f
 
     /** Index of the measurement nearest to horn position [t]. */
     fun hornIndex(t: Float): Int {
