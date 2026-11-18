@@ -1305,11 +1305,14 @@ class MainActivity : AppCompatActivity() {
 
     /** Close All, with the mode underneath so it's clear which clean it does. */
     private fun sweepLabel(): CharSequence {
-        val sb = android.text.SpannableStringBuilder("[ ⚡ CLOSE ALL & CLEAR CACHE ]")
+        val rapid = Shell.isReady()
+        val sb = android.text.SpannableStringBuilder(
+            if (rapid) "[ RAPID TOTAL CLEAN & CACHE CLEAR ]" else "[ BASIC CLEAN & CACHE CLEAR ]"
+        )
         val st = sb.length
-        sb.append(if (Shell.isReady()) "\nRAPID TOTAL CLEAN" else "\nBASIC CLEAN")
+        sb.append(if (rapid) "\nInstant complete clean (confident user)" else "\nIndividual app closer (average user)")
         sb.setSpan(android.text.style.RelativeSizeSpan(0.62f), st, sb.length, 0)
-        sb.setSpan(android.text.style.ForegroundColorSpan(if (Shell.isReady()) 0xFFFFB23A.toInt() else Hud.CYAN), st, sb.length, 0)
+        sb.setSpan(android.text.style.ForegroundColorSpan(if (rapid) 0xFFFFB23A.toInt() else Hud.CYAN), st, sb.length, 0)
         return sb
     }
 
@@ -1317,7 +1320,7 @@ class MainActivity : AppCompatActivity() {
     private fun rapidLabel(reconnect: Boolean): CharSequence {
         val sb = android.text.SpannableStringBuilder("RAPID TOTAL CLEAN")
         val st = sb.length
-        sb.append(if (reconnect) "\nTap to reconnect" else "\nEverything closed in seconds")
+        sb.append(if (reconnect) "\nTap to reconnect" else "\nInstant complete clean (confident user)")
         sb.setSpan(android.text.style.RelativeSizeSpan(0.62f), st, sb.length, 0)
         sb.setSpan(android.text.style.ForegroundColorSpan(0xFFFFC08A.toInt()), st, sb.length, 0)
         return sb
