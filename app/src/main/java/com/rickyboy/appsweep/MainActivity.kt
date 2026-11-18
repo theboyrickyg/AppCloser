@@ -363,73 +363,73 @@ class MainActivity : AppCompatActivity() {
 
         when (status) {
             Shell.Status.NEED_DEV_OPTIONS -> {
-                statusText.text = if (isTv) {
-                    "One-time setup (about a minute)\n\n" +
+                if (isTv) {
+                    statusText.text = "One-time setup (about a minute)\n\n" +
                         "Step 1 of 2: turn on Developer options.\n" +
                         "Settings → System → About → click \"Android TV OS build\" 7 times, " +
                         "until it says you're a developer. Then come back here."
+                    statusButton.text = "Open Settings"
+                    statusButton.setOnClickListener { openSettings(Settings.ACTION_DEVICE_INFO_SETTINGS) }
                 } else {
-                    "One-time setup (about a minute)\n\n" +
-                        "Step 1 of 3: turn on Developer options.\n" +
-                        "Settings → About phone → tap \"Build number\" 7 times " +
-                        "(on some phones it's under Software information). Then come back here."
+                    statusText.text = stepText(
+                        "RAPID TOTAL CLEAN SETUP · STEP 1 OF 2\n\n",
+                        "1. Tap ", Pair("  About phone  ", { openSettings(Settings.ACTION_DEVICE_INFO_SETTINGS) }), "\n",
+                        "2. Tap \"Build number\" 7 times until it says you're a developer ",
+                        "(on some phones it's under Software information).\n",
+                        "3. Enter your PIN if asked.\n\n",
+                        "Press Back to return here."
+                    )
+                    statusButton.visibility = View.GONE
                 }
-                statusButton.text = "Open Settings"
-                statusButton.setOnClickListener { openSettings(Settings.ACTION_DEVICE_INFO_SETTINGS) }
                 statusButton2.visibility = View.VISIBLE
-                statusButton2.text = "Done, next step"
+                statusButton2.text = "Next step →"
                 statusButton2.setOnClickListener { checkConnection(userAsked = false) }
             }
-            Shell.Status.NEED_DEBUGGING -> {
-                statusText.text = when {
-                    isTv ->
-                        "Step 2 of 2: turn on debugging.\n" +
+            Shell.Status.NEED_DEBUGGING, Shell.Status.NEED_PAIRING -> {
+                if (isTv) {
+                    if (status == Shell.Status.NEED_DEBUGGING) {
+                        statusText.text = "Step 2 of 2: turn on debugging.\n" +
                             "Settings → System → Developer options → switch on \"Network debugging\" " +
                             "(some TVs call it \"ADB debugging\"; if yours only has \"Wireless debugging\", switch that on).\n\n" +
                             "Then press Connect. If a box asks \"Allow debugging?\", tick \"Always allow\" and press OK."
-                    Adb.hasPaired(this) ->
-                        "Wireless debugging is off. Android switches it off after a restart or a Wi-Fi change.\n\n" +
-                            "Developer options → switch \"Wireless debugging\" back on (no new code needed), then press Connect."
-                    else ->
-                        "Step 2 of 3: turn on Wireless debugging.\n" +
-                            "Settings → System → Developer options → switch on \"Wireless debugging\" " +
-                            "(you need to be on Wi-Fi). Tap Allow if it asks. Then come back and press Connect."
-                }
-                statusButton.text = "Open Developer options"
-                statusButton.setOnClickListener { openSettings(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS) }
-                statusButton2.visibility = View.VISIBLE
-                statusButton2.text = "Connect"
-                statusButton2.setOnClickListener { checkConnection(userAsked = true) }
-            }
-            Shell.Status.NEED_PAIRING -> {
-                statusText.text = if (isTv) {
-                    "Last step: pair the app once.\n" +
-                        "Developer options → Wireless debugging → \"Pair device with pairing code\". " +
-                        "Write down the 6-digit code, press HOME on the remote (not Back), " +
-                        "open App Closer again, type the code below and press Pair."
-                } else {
-                    "Easiest: press \"★ Pair automatically\" and App Closer finds and enters the code for you." +
-                        (if (SweepAccessibilityService.isOn()) "" else " (The first time, it asks you to switch App Closer on in Accessibility. One time only.)") +
-                        "\n\nOr do it yourself:\n" +
-                    "Step 3 of 3: pair the app once.\n" +
-                        "1. Press \"Start pairing\" below.\n" +
-                        "2. In Wireless debugging, tap \"Pair device with pairing code\".\n" +
-                        "3. Pull down your notifications and type the 6-digit code into the " +
-                        "App Closer notification. Keep the code on screen while you do this.\n" +
-                        "4. Come back here when it says Paired ✓."
-                }
-                codeRow.visibility = View.VISIBLE
-                if (isTv) {
+                        statusButton.text = "Open Developer options"
+                        statusButton.setOnClickListener { openSettings(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS) }
+                    } else {
+                        statusText.text = "Step 2 of 2: pair the app once.\n" +
+                            "Developer options → Wireless debugging → \"Pair device with pairing code\". " +
+                            "Write down the 6-digit code, press HOME on the remote (not Back), " +
+                            "open App Closer again, type the code below and press Pair."
+                        codeRow.visibility = View.VISIBLE
+                        statusButton.text = "Open Developer options"
+                        statusButton.setOnClickListener { openSettings(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS) }
+                    }
+                    statusButton2.visibility = View.VISIBLE
+                    statusButton2.text = "Connect"
+                    statusButton2.setOnClickListener { checkConnection(userAsked = true) }
+                } else if (status == Shell.Status.NEED_DEBUGGING && Adb.hasPaired(this)) {
+                    // already paired before: Wireless debugging just needs switching back on
+                    statusText.text = "Wireless debugging is off. Android switches it off after a restart or a Wi-Fi change.\n\n" +
+                        "Developer options → switch \"Wireless debugging\" back on (no new code needed), then press Connect."
                     statusButton.text = "Open Developer options"
                     statusButton.setOnClickListener { openSettings(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS) }
+                    statusButton2.visibility = View.VISIBLE
+                    statusButton2.text = "Connect"
+                    statusButton2.setOnClickListener { checkConnection(userAsked = true) }
                 } else {
-                    statusButton.text = "Start pairing"
-                    statusButton.setOnClickListener { startPhonePairing() }
+                    statusText.text = "RAPID TOTAL CLEAN SETUP · STEP 2 OF 2\n\n" +
+                        "Tap \"★ Pair automatically\". App Closer switches on Wireless debugging (you need Wi-Fi), " +
+                        "finds the 6-digit code and enters it for you. Don't touch the screen for a few seconds." +
+                        (if (SweepAccessibilityService.isOn()) "" else
+                            "\n\nThe first time, it asks you to switch App Closer on in Accessibility. One time only.")
+                    statusText2.visibility = View.VISIBLE
+                    statusText2.text = "Doing it yourself: Developer options → switch on Wireless debugging → " +
+                        "\"Pair device with pairing code\". Pull down your notifications and type the 6-digit code " +
+                        "into the App Closer notification."
+                    statusButton.text = "★ Pair automatically"
+                    statusButton2.visibility = View.VISIBLE
+                    statusButton2.text = "Enter the code myself"
+                    offerAutoPair()
                 }
-                statusButton2.visibility = View.VISIBLE
-                statusButton2.text = "Connect"
-                statusButton2.setOnClickListener { checkConnection(userAsked = true) }
-                if (!isTv) offerAutoPair()
             }
             Shell.Status.CONNECTING -> {
                 statusText.text = "Connecting…\n\nIf a box pops up asking \"Allow debugging?\", " +
@@ -585,7 +585,8 @@ class MainActivity : AppCompatActivity() {
      * that order: try → unlock → switch on.
      */
     private fun showEasySetup() {
-        val title = if (pairHelper) "RAPID TOTAL CLEAN · TURN ON AUTO-PAIRING" else "BASIC CLEAN SETUP"
+        val title = if (pairHelper) "RAPID SETUP · STEP 2 OF 2\nSwitch on auto-pairing" else "BASIC CLEAN SETUP"
+        val word = if (pairHelper) "PART" else "STEP"
         statusCard.visibility = View.VISIBLE
         hideSetupExtras()
         resetStatusTextStyle()
@@ -614,7 +615,7 @@ class MainActivity : AppCompatActivity() {
         when (step) {
             1 -> {
                 statusText.text = stepText(
-                    "$title · STEP 1 OF 3\n\n",
+                    "$title · $word 1 OF 3\n\n",
                     "1. Tap ", Pair("  Accessibility  ", openAccessibility), "\n",
                     "2. Tap \"App Closer\" even though it is greyed out. It looks like this:"
                 )
@@ -630,7 +631,7 @@ class MainActivity : AppCompatActivity() {
             }
             2 -> {
                 statusText.text = stepText(
-                    "$title · STEP 2 OF 3\n\n",
+                    "$title · $word 2 OF 3\n\n",
                     "1. Tap ", Pair("  Open app info  ", {
                         awaitingStep = 3
                         openSettingsUri(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:$packageName")
@@ -649,7 +650,7 @@ class MainActivity : AppCompatActivity() {
             }
             else -> {
                 statusText.text = stepText(
-                    if (needsUnlock) "$title · STEP 3 OF 3\n\n" else "$title\n\n",
+                    if (needsUnlock) "$title · $word 3 OF 3\n\n" else "$title\n\n",
                     "1. Tap ", Pair("  Accessibility  ", openAccessibility), if (needsUnlock) " again\n" else "\n",
                     if (isTv) "2. Choose App Closer (under Services or Downloaded services).\n3. Switch it on and choose OK.\n"
                     else "2. Tap App Closer (under Downloaded apps).\n3. Turn on \"Use App Closer\" and tap Allow.\n",
@@ -936,6 +937,7 @@ class MainActivity : AppCompatActivity() {
             if (clearRecents) setOwnRecentsHidden(false)
             cleanGauge.finish()
             showSweepDone(result)
+            showRapidAllClean()
         }
     }
 
@@ -1255,6 +1257,23 @@ class MainActivity : AppCompatActivity() {
             hideSetupExtras()
             showChoice()
         }
+    }
+
+    /** Rapid Total Clean finished: the happy ram, smoking from the speed, says ALL CLEAN. */
+    private fun showRapidAllClean() {
+        if (isFinishing) return
+        val d = android.app.Dialog(this, android.R.style.Theme_Translucent_NoTitleBar)
+        val frame = android.widget.FrameLayout(this).apply {
+            setBackgroundColor(0xE607070F.toInt())
+            val v = RapidCleanView(this@MainActivity)
+            val wpx = (minOf(resources.displayMetrics.widthPixels, resources.displayMetrics.heightPixels) * 0.9f).toInt()
+            addView(v, android.widget.FrameLayout.LayoutParams(wpx, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                android.view.Gravity.CENTER))
+            setOnClickListener { d.dismiss() }
+        }
+        d.setContentView(frame)
+        d.show()
+        frame.postDelayed({ if (d.isShowing) d.dismiss() }, 3800)
     }
 
     private fun setOwnRecentsHidden(hidden: Boolean) {
