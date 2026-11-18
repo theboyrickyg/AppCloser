@@ -58,7 +58,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var resultText: TextView
     private lateinit var resultRow: LinearLayout
     private lateinit var allCleanView: View
-    private lateinit var closeAppButton: Button
+    private var closeX: Button? = null     // not on the TV layout
     private lateinit var tvAutoButton: Button
     private var sweptThisSession = false
     private var awaitingStep = -1   // which Easy step to show after coming back from Settings
@@ -95,7 +95,6 @@ class MainActivity : AppCompatActivity() {
     private var autoSweepPending = false
     private var unlockDialog: AlertDialog? = null
     private lateinit var instantLink: Button
-    private lateinit var recentsSwitch: android.widget.Switch
     private var titleTaps = 0
     private var titleTapStart = 0L
 
@@ -152,8 +151,8 @@ class MainActivity : AppCompatActivity() {
         resultText = findViewById(R.id.resultText)
         resultRow = findViewById(R.id.resultRow)
         allCleanView = findViewById(R.id.allCleanView)
-        closeAppButton = findViewById(R.id.closeAppButton)
-        closeAppButton.setOnClickListener {
+        closeX = findViewById(R.id.closeX)
+        closeX?.setOnClickListener {
             // straight to the home screen, so nothing App Closer opened is left showing
             try {
                 startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -183,9 +182,6 @@ class MainActivity : AppCompatActivity() {
         list.itemAnimator = null // smooth live updates, keeps TV remote focus in place
 
         sweepButton.setOnClickListener { sweepAll() }
-        recentsSwitch = findViewById(R.id.recentsSwitch)
-        recentsSwitch.isChecked = Prefs.clearRecents(this)
-        recentsSwitch.setOnCheckedChangeListener { _, on -> Prefs.setClearRecents(this, on) }
         instantLink = findViewById(R.id.instantLink)
         instantLink.setOnClickListener {
             if (setupChoice == "pro" && Adb.hasWorkedBefore(this) && Unlock.isUnlocked(this)) checkConnection(userAsked = true)
@@ -326,10 +322,8 @@ class MainActivity : AppCompatActivity() {
         val isReady = status == Shell.Status.READY
         // Normal mode running: offer Instant mode (or reconnecting it, if it was set up before)
         instantLink.visibility = if (!isTv && isReady && !Shell.isReady()) View.VISIBLE else View.GONE
-        // TV guided closing (no Accessibility, no Instant mode) can't reach the Recents screen
-        recentsSwitch.visibility =
-            if (isReady && (!isTv || SweepAccessibilityService.isOn() || Shell.isReady())) View.VISIBLE else View.GONE
-        instantLink.text = if (setupChoice == "pro" && Adb.hasWorkedBefore(this)) "⚡ Reconnect Rapid Total Clean" else "⚡ Rapid Total Clean (advanced)"
+        instantLink.text = rapidLabel(setupChoice == "pro" && Adb.hasWorkedBefore(this))
+        if (!busy) sweepButton.text = sweepLabel()
         statusCard.visibility = if (isReady) View.GONE else View.VISIBLE
         sweepButton.isEnabled = isReady && !busy
         sweepButton.alpha = if (isReady) 1f else 0.4f
@@ -888,7 +882,6 @@ class MainActivity : AppCompatActivity() {
         adapter.items = currentApps
         val userApps = currentApps.count { !it.isSystem && it.isRunning }
         appsCountText.text = colored("LAUNCHED APPS: ", 0, "$userApps", Hud.CYAN)
-        updateCloseAppButton(userApps)
         tvAutoButton.visibility = if (tvGuided && !busy) View.VISIBLE else View.GONE
         if (tvList) {
             listHeader.text = colored("LAUNCHED APPS ", 0, "[ $userApps ]", Hud.CYAN)
@@ -1140,7 +1133,6 @@ class MainActivity : AppCompatActivity() {
     private fun startSweepUi() {
         busy = true
         tvAutoButton.visibility = View.GONE
-        closeAppButton.visibility = View.GONE
         allCleanView.animate().cancel()
         allCleanView.visibility = View.GONE
         sweepButton.visibility = View.VISIBLE
@@ -1156,7 +1148,7 @@ class MainActivity : AppCompatActivity() {
         busy = false
         sweepButton.isEnabled = true
         sweepButton.background = Hud.button(this, Hud.BLUE)
-        sweepButton.text = getString(R.string.sweep_button)
+        sweepButton.text = sweepLabel()
         cleanGauge.reset()
     }
 
@@ -1203,7 +1195,7 @@ class MainActivity : AppCompatActivity() {
             // closed some (e.g. a single app) but others are still open: no "All clean!"
             resultText.visibility = View.GONE
             sweepButton.background = Hud.button(this, Hud.BLUE)
-            sweepButton.text = getString(R.string.sweep_button)
+            sweepButton.text = sweepLabel()
             cleanGauge.reset()
         } else {
             resultText.text = if (isTv && !Shell.isReady() && !SweepAccessibilityService.isOn()) {
@@ -1215,7 +1207,7 @@ class MainActivity : AppCompatActivity() {
             }
             resultText.visibility = View.VISIBLE
             sweepButton.background = Hud.button(this, Hud.BLUE)
-            sweepButton.text = getString(R.string.sweep_button)
+            sweepButton.text = sweepLabel()
             cleanGauge.reset()
         }
         refresh()
@@ -1228,15 +1220,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** "Close this app" only once a sweep has finished and there's nothing left to clean. */
-    private fun updateCloseAppButton(openApps: Int = currentApps.count { !it.isSystem && it.isRunning }) {
-        closeAppButton.visibility = if (sweptThisSession && !busy && openApps == 0) View.VISIBLE else View.GONE
-    }
-
     /** Back to the normal pink button (after the happy ram has had its moment). */
     private fun showSweepButton() {
         sweepButton.background = Hud.button(this, Hud.BLUE)
-        sweepButton.text = getString(R.string.sweep_button)
+        sweepButton.text = sweepLabel()
         if (allCleanView.visibility == View.VISIBLE) {
             allCleanView.animate().alpha(0f).setDuration(250).withEndAction {
                 allCleanView.visibility = View.GONE
@@ -1301,7 +1288,9 @@ class MainActivity : AppCompatActivity() {
         ramFreeText.background = HudDrawable(resources.displayMetrics.density, Hud.GREEN,
             0xFF0B2A1C.toInt(), 0xFF081E14.toInt(), cut = 7f, glow = false, accents = false)
         sweepButton.background = Hud.button(this, Hud.BLUE)
-        closeAppButton.background = Hud.button(this, Hud.GREEN)
+        closeX?.background = HudDrawable(resources.displayMetrics.density, Hud.RED,
+            0xFF3A0C12.toInt(), 0xFF24070B.toInt(), cut = 7f, glow = false, accents = false)
+        sweepButton.text = sweepLabel()
         for (id in intArrayOf(R.id.basicButton, R.id.rapidButton, R.id.statusButton, R.id.statusButton2,
             R.id.linkButton, R.id.pairButton, R.id.tvAutoButton)) {
             findViewById<View>(id)?.background = Hud.button(this, Hud.CYAN)
@@ -1309,11 +1298,29 @@ class MainActivity : AppCompatActivity() {
         (statClosed.parent as? View)?.background = Hud.statBox(this, Hud.BLUE)
         (statRam.parent as? View)?.background = Hud.statBox(this, Hud.GREEN)
         (statCache.parent as? View)?.background = Hud.statBox(this, Hud.PURPLE)
-        recentsSwitch.background = Hud.row(this)
-        val states = arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf())
-        recentsSwitch.thumbTintList = android.content.res.ColorStateList(states, intArrayOf(Hud.GREEN, Hud.RED))
-        recentsSwitch.trackTintList = android.content.res.ColorStateList(states, intArrayOf(0x662EE68A, 0x66FF4D5E))
-        instantLink.background = Hud.hazard(this)
+        // the upgrade: warm fiery orange, so it stands out and invites a tap
+        instantLink.background = HudDrawable(resources.displayMetrics.density, 0xFFFF8A1E.toInt(),
+            0xFF4A1E06.toInt(), 0xFF2A0F04.toInt(), cut = 16f)
+    }
+
+    /** Close All, with the mode underneath so it's clear which clean it does. */
+    private fun sweepLabel(): CharSequence {
+        val sb = android.text.SpannableStringBuilder("[ ⚡ CLOSE ALL & CLEAR CACHE ]")
+        val st = sb.length
+        sb.append(if (Shell.isReady()) "\nRAPID TOTAL CLEAN" else "\nBASIC CLEAN")
+        sb.setSpan(android.text.style.RelativeSizeSpan(0.62f), st, sb.length, 0)
+        sb.setSpan(android.text.style.ForegroundColorSpan(if (Shell.isReady()) 0xFFFFB23A.toInt() else Hud.CYAN), st, sb.length, 0)
+        return sb
+    }
+
+    /** The Rapid Total Clean button: name on top (with the fire), a short reason underneath. */
+    private fun rapidLabel(reconnect: Boolean): CharSequence {
+        val sb = android.text.SpannableStringBuilder("RAPID TOTAL CLEAN")
+        val st = sb.length
+        sb.append(if (reconnect) "\nTap to reconnect" else "\nEverything closed in seconds")
+        sb.setSpan(android.text.style.RelativeSizeSpan(0.62f), st, sb.length, 0)
+        sb.setSpan(android.text.style.ForegroundColorSpan(0xFFFFC08A.toInt()), st, sb.length, 0)
+        return sb
     }
 
     /** "[ 05 ]" with the brackets in the box's colour. */
@@ -1496,7 +1503,7 @@ class MainActivity : AppCompatActivity() {
         val used = info.totalMem - info.availMem
         ramGauge.setPercent(used * 100f / info.totalMem)
         // Used = red, available = green, everything else white
-        ramUsedText.text = colored(gb(used), Hud.CYAN, " / ", 0xFF5C7F99.toInt(), gb(info.totalMem), 0xFF7FB8E6.toInt())
+        ramUsedText.text = colored(gb(used), Hud.RED, " / ", 0xFF5C7F99.toInt(), gb(info.totalMem), Hud.GREEN)
         ramFreeText.text = "${gb(info.availMem)} AVAILABLE"
     }
 

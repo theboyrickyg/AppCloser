@@ -28,16 +28,21 @@
             android:textColor="@color/neon_cyan"
             android:textSize="21sp" />
 
-        <TextView
-            android:id="@+id/sysOk"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+        <!-- Close App Closer: small red square in the corner -->
+        <Button
+            android:id="@+id/closeX"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:layout_gravity="end|center_vertical"
-            android:fontFamily="@font/share_tech_mono"
-            android:gravity="center"
-            android:text="∿∿∿\nSYS // OK"
-            android:textColor="@color/accent_green"
-            android:textSize="8sp" />
+            android:contentDescription="Close App Closer"
+            android:fontFamily="@font/rajdhani_bold"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="0dp"
+            android:stateListAnimator="@null"
+            android:text="✕"
+            android:textColor="#FFFF6B78"
+            android:textSize="18sp" />
     </FrameLayout>
 
     <LinearLayout

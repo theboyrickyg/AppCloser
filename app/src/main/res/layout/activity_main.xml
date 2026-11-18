@@ -262,7 +262,10 @@
         <Button
             android:id="@+id/sweepButton"
             android:layout_width="match_parent"
-            android:layout_height="68dp"
+            android:layout_height="wrap_content"
+            android:minHeight="76dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
                     android:background="@drawable/bg_sweep_button"
             android:enabled="false"
             android:alpha="0.4"
@@ -442,23 +445,6 @@
         android:textStyle="normal"
         android:visibility="gone" />
 
-    <!-- Appears once everything is clean: leaves the app -->
-    <Button
-        android:id="@+id/closeAppButton"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:layout_marginTop="12dp"
-        android:background="@drawable/bg_sweep_done"
-        android:fontFamily="@font/rajdhani_bold"
-        android:letterSpacing="0.06"
-        android:shadowColor="#AA2EE68A"
-        android:shadowRadius="10"
-        android:stateListAnimator="@null"
-        android:text="‹   CLOSE THIS APP   ›"
-        android:textColor="@color/text_main"
-        android:textSize="21sp"
-        android:visibility="gone" />
-
     <TextView
         android:shadowColor="#00000000"
         android:shadowRadius="12"
@@ -512,34 +498,25 @@
             android:paddingBottom="6dp" />
     </LinearLayout>
 
-    <!-- Also wipe the Recents screen (the app cards) after Close All -->
-    <Switch
-        android:id="@+id/recentsSwitch"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:minHeight="52dp"
-        android:paddingStart="18dp"
-        android:paddingEnd="14dp"
-        android:text="Also clear the Recents screen"
-        android:textColor="@color/text_main"
-        android:textSize="15sp"
-        android:visibility="gone" />
-
-    <!-- Rapid Total Clean (Developer options) is tucked away here for confident users -->
-    <Button
+    <!-- Rapid Total Clean (Developer options): the upgrade, with fire either side -->
+    <com.rickyboy.appsweep.SpeedButton
         android:id="@+id/instantLink"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:layout_marginTop="12dp"
-        android:layout_marginBottom="16dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:layout_marginBottom="18dp"
         android:fontFamily="@font/rajdhani_bold"
-        android:letterSpacing="0.06"
+        android:gravity="center"
+        android:letterSpacing="0.05"
+        android:minHeight="84dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:shadowColor="#AAFF7A18"
+        android:shadowRadius="10"
         android:stateListAnimator="@null"
-        android:text="⚡ RAPID TOTAL CLEAN (ADVANCED)"
         android:textAllCaps="false"
-        android:textColor="@color/neon_amber"
-        android:textSize="17sp"
+        android:textColor="@color/text_main"
+        android:textSize="22sp"
         android:visibility="gone" />
 </LinearLayout>
 </androidx.core.widget.NestedScrollView>
