@@ -48,7 +48,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="18dp"
-            android:text="Sweeping…"
+            android:text="Cleaning…"
             android:textColor="@color/text_main"
             android:textSize="20sp"
             android:textStyle="bold" />

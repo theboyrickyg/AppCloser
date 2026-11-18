@@ -74,7 +74,7 @@ class QuickSweepActivity : AppCompatActivity() {
                 openButton.requestFocus()
                 return@launch
             }
-            status.text = "Sweeping…"
+            status.text = "Cleaning…"
             Unlock.useClean(applicationContext)
             val r = withContext(Dispatchers.IO) {
                 sweeper.sweepAll(sweeper.scan(includeSystem = false), clearRecents = Prefs.clearRecents(applicationContext))

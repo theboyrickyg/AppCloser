@@ -1126,8 +1126,8 @@ class MainActivity : AppCompatActivity() {
         allCleanView.visibility = View.GONE
         sweepButton.visibility = View.VISIBLE
         sweepButton.isEnabled = false
-        sweepButton.setBackgroundResource(R.drawable.bg_sweep_button)
-        sweepButton.text = "SWEEPING…"
+        sweepButton.setBackgroundResource(R.drawable.bg_sweep_done)   // green while it cleans
+        sweepButton.text = "CLEANING…"
         resultText.visibility = View.GONE
         resultRow.visibility = View.GONE
         cleanGauge.startCleaning()
@@ -1136,6 +1136,7 @@ class MainActivity : AppCompatActivity() {
     private fun endSweepUi() {
         busy = false
         sweepButton.isEnabled = true
+        sweepButton.setBackgroundResource(R.drawable.bg_sweep_button)
         sweepButton.text = getString(R.string.sweep_button)
         cleanGauge.reset()
     }
