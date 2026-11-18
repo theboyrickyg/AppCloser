@@ -166,21 +166,24 @@ class CleanGaugeView @JvmOverloads constructor(
         }
         canvas.restore()
 
-        // Reading, bottom-right (the ram faces left, so this corner is clear)
-        val (big, small, glow) = when (mode) {
-            Mode.IDLE -> Triple("READY", "TO CLEAN", red)
+        // Reading, bottom-right (the ram faces left, so this corner is clear). Nothing while idle.
+        val reading = when (mode) {
+            Mode.IDLE -> null
             Mode.CLEANING -> Triple("${shown.roundToInt()}%", "CLEANING", red)
             Mode.DONE -> Triple("CLEAN", "COMPLETE", green)
         }
-        bigFill.textSize = if (mode == Mode.CLEANING) 72f else 58f
-        bigFill.setShadowLayer(10f, 0f, 2f, Color.BLACK)   // readable over the horn
-        smallFill.color = glow
-        smallFill.setShadowLayer(6f, 0f, 1f, Color.BLACK)
-        // Big word kept to the bottom-right corner, small word centred underneath it
-        val right = RamArt.CLEAN_W - 16f
-        val centre = right - bigFill.measureText(big) / 2f
-        canvas.drawText(big, centre, RamArt.CLEAN_H - 44f, bigFill)
-        canvas.drawText(small, centre, RamArt.CLEAN_H - 12f, smallFill)
+        if (reading != null) {
+            val (big, small, glow) = reading
+            bigFill.textSize = if (mode == Mode.CLEANING) 72f else 58f
+            bigFill.setShadowLayer(10f, 0f, 2f, Color.BLACK)   // readable over the horn
+            smallFill.color = glow
+            smallFill.setShadowLayer(6f, 0f, 1f, Color.BLACK)
+            // Big word kept to the bottom-right corner, small word centred underneath it
+            val right = RamArt.CLEAN_W - 16f
+            val centre = right - bigFill.measureText(big) / 2f
+            canvas.drawText(big, centre, RamArt.CLEAN_H - 44f, bigFill)
+            canvas.drawText(small, centre, RamArt.CLEAN_H - 12f, smallFill)
+        }
         canvas.restore()
 
         // keep the apps moving: smooth while cleaning, a gentle 25 fps bob while idle

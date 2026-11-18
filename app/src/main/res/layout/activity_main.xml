@@ -307,6 +307,25 @@
         </LinearLayout>
     </FrameLayout>
 
+    <!-- Rapid Total Clean (Developer options): the upgrade, with fire either side -->
+    <com.rickyboy.appsweep.SpeedButton
+        android:id="@+id/instantLink"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:fontFamily="@font/rajdhani_bold"
+        android:gravity="center"
+        android:letterSpacing="0.05"
+        android:minHeight="84dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:shadowColor="#AAFF7A18"
+        android:shadowRadius="10"
+        android:stateListAnimator="@null"
+        android:textAllCaps="false"
+        android:textColor="@color/text_main"
+        android:textSize="22sp"
+        android:visibility="gone" />
     <!-- TV only: optional one-time switch that makes closing fully automatic -->
     <Button
         android:id="@+id/tvAutoButton"
@@ -498,25 +517,9 @@
             android:paddingBottom="6dp" />
     </LinearLayout>
 
-    <!-- Rapid Total Clean (Developer options): the upgrade, with fire either side -->
-    <com.rickyboy.appsweep.SpeedButton
-        android:id="@+id/instantLink"
+    <Space
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="14dp"
-        android:layout_marginBottom="18dp"
-        android:fontFamily="@font/rajdhani_bold"
-        android:gravity="center"
-        android:letterSpacing="0.05"
-        android:minHeight="84dp"
-        android:paddingTop="10dp"
-        android:paddingBottom="10dp"
-        android:shadowColor="#AAFF7A18"
-        android:shadowRadius="10"
-        android:stateListAnimator="@null"
-        android:textAllCaps="false"
-        android:textColor="@color/text_main"
-        android:textSize="22sp"
-        android:visibility="gone" />
+        android:layout_height="18dp" />
+
 </LinearLayout>
 </androidx.core.widget.NestedScrollView>
