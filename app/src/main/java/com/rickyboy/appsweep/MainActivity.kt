@@ -191,6 +191,7 @@ class MainActivity : AppCompatActivity() {
             if (setupChoice == "pro" && Adb.hasWorkedBefore(this) && Unlock.isUnlocked(this)) checkConnection(userAsked = true)
             else startInstantSetup()
         }
+        applyHudTheme()
 
         Shell.readyListeners.add(onShellReady)
         Shizuku.addBinderReceivedListenerSticky(binderReceived)
@@ -423,9 +424,9 @@ class MainActivity : AppCompatActivity() {
     private fun clearList() {
         currentApps = emptyList()
         adapter.items = emptyList()
-        listHeader.text = "Running apps"
+        listHeader.text = "RUNNING APPS"
         statsText.text = ""
-        appsCountText.text = "Launched apps: –"
+        appsCountText.text = "LAUNCHED APPS: –"
         if (statusButton.visibility == View.VISIBLE) statusButton.requestFocus()
     }
 
@@ -830,7 +831,7 @@ class MainActivity : AppCompatActivity() {
         if (silent && scanJob?.isActive == true) return
         scanJob?.cancel()
         scanJob = lifecycleScope.launch {
-            if (currentApps.isEmpty()) listHeader.text = "Scanning…"
+            if (currentApps.isEmpty()) listHeader.text = "SCANNING…"
             val easy = easyMode
             val guided = tvGuided
             val tvLaunched = tvList
@@ -886,22 +887,22 @@ class MainActivity : AppCompatActivity() {
         }
         adapter.items = currentApps
         val userApps = currentApps.count { !it.isSystem && it.isRunning }
-        appsCountText.text = colored("Launched apps: ", 0, "$userApps", RED)
+        appsCountText.text = colored("LAUNCHED APPS: ", 0, "$userApps", Hud.CYAN)
         updateCloseAppButton(userApps)
         tvAutoButton.visibility = if (tvGuided && !busy) View.VISIBLE else View.GONE
         if (tvList) {
-            listHeader.text = colored("Launched apps (", 0, "$userApps", RED, ")")
+            listHeader.text = colored("LAUNCHED APPS ", 0, "[ $userApps ]", Hud.CYAN)
             listHint.text = if (userApps == 0) "No launched apps. All clean!"
                 else "Select an app to close just that one"
         } else if (easyMode) {
-            listHeader.text = colored("Opened apps (", 0, "$userApps", RED, ")")
+            listHeader.text = colored("OPENED APPS ", 0, "[ $userApps ]", Hud.CYAN)
             listHint.text = if (userApps == 0) {
                 "Nothing open right now. Apps you open will show up here, ready for your next sweep."
             } else {
                 "Most recently opened first · Tap an app for options · Hold to close it"
             }
         } else {
-            listHeader.text = colored("Running apps (", 0, "$userApps", RED, ")")
+            listHeader.text = colored("RUNNING APPS ", 0, "[ $userApps ]", Hud.CYAN)
             listHint.text = if (userApps == 0) {
                 "No apps running in the background. All clean!"
             } else {
@@ -1144,8 +1145,8 @@ class MainActivity : AppCompatActivity() {
         allCleanView.visibility = View.GONE
         sweepButton.visibility = View.VISIBLE
         sweepButton.isEnabled = false
-        sweepButton.setBackgroundResource(R.drawable.bg_sweep_done)   // green while it cleans
-        sweepButton.text = "CLEANING…"
+        sweepButton.background = Hud.button(this, Hud.GREEN)   // green while it cleans
+        sweepButton.text = "[ CLEANING… ]"
         resultText.visibility = View.GONE
         resultRow.visibility = View.GONE
         cleanGauge.startCleaning()
@@ -1154,7 +1155,7 @@ class MainActivity : AppCompatActivity() {
     private fun endSweepUi() {
         busy = false
         sweepButton.isEnabled = true
-        sweepButton.setBackgroundResource(R.drawable.bg_sweep_button)
+        sweepButton.background = Hud.button(this, Hud.BLUE)
         sweepButton.text = getString(R.string.sweep_button)
         cleanGauge.reset()
     }
@@ -1179,9 +1180,9 @@ class MainActivity : AppCompatActivity() {
     /** Green button + "Closed 6 apps · freed …", then back to normal after 5 seconds. */
     private fun showSweepDone(result: SweepResult) {
         Unlock.addTotals(this, result.closed, result.cacheFreed)
-        statClosed.text = result.closed.toString()
-        statRam.text = AppAdapter.formatBytes(result.ramFreed)
-        statCache.text = AppAdapter.formatBytes(result.cacheFreed)
+        statClosed.text = bracketed(String.format(java.util.Locale.UK, "%02d", result.closed), Hud.BLUE)
+        statRam.text = bracketed(AppAdapter.formatBytes(result.ramFreed), Hud.GREEN)
+        statCache.text = bracketed(AppAdapter.formatBytes(result.cacheFreed), Hud.PURPLE)
         resultRow.visibility = View.VISIBLE
         busy = false
         sweepButton.isEnabled = true
@@ -1201,7 +1202,7 @@ class MainActivity : AppCompatActivity() {
         } else if (result.closed > 0) {
             // closed some (e.g. a single app) but others are still open: no "All clean!"
             resultText.visibility = View.GONE
-            sweepButton.setBackgroundResource(R.drawable.bg_sweep_button)
+            sweepButton.background = Hud.button(this, Hud.BLUE)
             sweepButton.text = getString(R.string.sweep_button)
             cleanGauge.reset()
         } else {
@@ -1213,7 +1214,7 @@ class MainActivity : AppCompatActivity() {
                 "Nothing needed closing. Everything was already clean."
             }
             resultText.visibility = View.VISIBLE
-            sweepButton.setBackgroundResource(R.drawable.bg_sweep_button)
+            sweepButton.background = Hud.button(this, Hud.BLUE)
             sweepButton.text = getString(R.string.sweep_button)
             cleanGauge.reset()
         }
@@ -1234,7 +1235,7 @@ class MainActivity : AppCompatActivity() {
 
     /** Back to the normal pink button (after the happy ram has had its moment). */
     private fun showSweepButton() {
-        sweepButton.setBackgroundResource(R.drawable.bg_sweep_button)
+        sweepButton.background = Hud.button(this, Hud.BLUE)
         sweepButton.text = getString(R.string.sweep_button)
         if (allCleanView.visibility == View.VISIBLE) {
             allCleanView.animate().alpha(0f).setDuration(250).withEndAction {
@@ -1291,6 +1292,32 @@ class MainActivity : AppCompatActivity() {
             showChoice()
         }
     }
+
+    /** The sci-fi HUD look: cut-corner neon panels and buttons. */
+    private fun applyHudTheme() {
+        findViewById<View>(R.id.ramPanel)?.background = Hud.panel(this)
+        statusCard.background = Hud.panel(this)
+        findViewById<View>(R.id.listPanel)?.background = Hud.panel(this)
+        ramFreeText.background = HudDrawable(resources.displayMetrics.density, Hud.GREEN,
+            0xFF0B2A1C.toInt(), 0xFF081E14.toInt(), cut = 7f, glow = false, accents = false)
+        sweepButton.background = Hud.button(this, Hud.BLUE)
+        closeAppButton.background = Hud.button(this, Hud.GREEN)
+        for (id in intArrayOf(R.id.basicButton, R.id.rapidButton, R.id.statusButton, R.id.statusButton2,
+            R.id.linkButton, R.id.pairButton, R.id.tvAutoButton)) {
+            findViewById<View>(id)?.background = Hud.button(this, Hud.CYAN)
+        }
+        (statClosed.parent as? View)?.background = Hud.statBox(this, Hud.BLUE)
+        (statRam.parent as? View)?.background = Hud.statBox(this, Hud.GREEN)
+        (statCache.parent as? View)?.background = Hud.statBox(this, Hud.PURPLE)
+        recentsSwitch.background = Hud.row(this)
+        val states = arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf())
+        recentsSwitch.thumbTintList = android.content.res.ColorStateList(states, intArrayOf(Hud.GREEN, Hud.RED))
+        recentsSwitch.trackTintList = android.content.res.ColorStateList(states, intArrayOf(0x662EE68A, 0x66FF4D5E))
+        instantLink.background = Hud.hazard(this)
+    }
+
+    /** "[ 05 ]" with the brackets in the box's colour. */
+    private fun bracketed(value: String, color: Int): CharSequence = colored("[ ", color, value, 0, " ]", color)
 
     /** Rapid Total Clean finished: the smiling ram with glowing horns, ALL CLEAN and the time taken. */
     private fun showRapidAllClean(seconds: Float) {
@@ -1469,8 +1496,8 @@ class MainActivity : AppCompatActivity() {
         val used = info.totalMem - info.availMem
         ramGauge.setPercent(used * 100f / info.totalMem)
         // Used = red, available = green, everything else white
-        ramUsedText.text = colored(gb(used), RED, " / ${gb(info.totalMem)}")
-        ramFreeText.text = colored(gb(info.availMem), GREEN, " available")
+        ramUsedText.text = colored(gb(used), Hud.CYAN, " / ", 0xFF5C7F99.toInt(), gb(info.totalMem), 0xFF7FB8E6.toInt())
+        ramFreeText.text = "${gb(info.availMem)} AVAILABLE"
     }
 
     /** 4.25 GB style */

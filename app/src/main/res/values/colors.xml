@@ -1,12 +1,16 @@
 <resources>
-    <color name="bg">#FF07070F</color>
-    <color name="card">#FF12121F</color>
-    <color name="card_focus">#FF1E1E36</color>
-    <color name="neon_cyan">#FFFFFFFF</color>      <!-- was neon blue: now plain white -->
-    <color name="neon_pink">#FFE53935</color>      <!-- was neon pink: now red -->
-    <color name="neon_purple">#FFB71C1C</color>    <!-- dark red -->
-    <color name="accent_red">#FFE53935</color>
-    <color name="accent_green">#FF00E676</color>
-    <color name="text_main">#FFFFFFFF</color>
-    <color name="text_dim">#FF9A9AB8</color>
+    <!-- Sci-fi HUD theme: deep navy with neon cyan, blue, green, purple and amber -->
+    <color name="bg">#FF061019</color>
+    <color name="card">#FF0B1A28</color>
+    <color name="card_focus">#FF12304A</color>
+    <color name="neon_cyan">#FF35D7FF</color>
+    <color name="neon_blue">#FF2E8BFF</color>
+    <color name="neon_pink">#FF2E8BFF</color>
+    <color name="neon_purple">#FF1A4E99</color>
+    <color name="neon_violet">#FFB57BFF</color>
+    <color name="neon_amber">#FFFFC640</color>
+    <color name="accent_red">#FFFF4D5E</color>
+    <color name="accent_green">#FF2EE68A</color>
+    <color name="text_main">#FFE6F7FF</color>
+    <color name="text_dim">#FF7FA6BF</color>
 </resources>

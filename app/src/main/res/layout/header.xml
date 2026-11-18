@@ -6,36 +6,63 @@
     android:gravity="center_horizontal"
     android:orientation="vertical">
 
-    <TextView
-        android:id="@+id/appTitle"
-        android:shadowColor="#00000000"
-        android:shadowRadius="12"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:letterSpacing="0.15"
-        android:text="APP CLOSER"
-        android:textColor="@color/text_main"
-        android:textSize="17sp"
-        android:textStyle="bold" />
+    <!-- Title in its glowing bracket frame, with a little "system OK" readout -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <TextView
+            android:id="@+id/appTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:fontFamily="@font/orbitron_bold"
+            android:letterSpacing="0.12"
+            android:paddingStart="26dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="26dp"
+            android:paddingBottom="8dp"
+            android:shadowColor="#AA35D7FF"
+            android:shadowRadius="14"
+            android:text="APP CLOSER"
+            android:textColor="@color/neon_cyan"
+            android:textSize="21sp" />
+
+        <TextView
+            android:id="@+id/sysOk"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end|center_vertical"
+            android:fontFamily="@font/share_tech_mono"
+            android:gravity="center"
+            android:text="∿∿∿\nSYS // OK"
+            android:textColor="@color/accent_green"
+            android:textSize="8sp" />
+    </FrameLayout>
 
     <LinearLayout
+        android:id="@+id/ramPanel"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:paddingStart="14dp"
+        android:paddingTop="12dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="12dp">
 
         <com.rickyboy.appsweep.RamGaugeView
             android:id="@+id/ramGauge"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="10dp"
+            android:layout_marginEnd="6dp"
             android:layout_weight="1" />
 
         <com.rickyboy.appsweep.CleanGaugeView
             android:id="@+id/cleanGauge"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
+            android:layout_marginStart="6dp"
             android:layout_weight="1" />
     </LinearLayout>
 
@@ -47,38 +74,47 @@
         android:orientation="vertical">
 
             <TextView
-        android:shadowColor="#00000000"
-        android:shadowRadius="12"
                 android:id="@+id/ramUsedText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
+                android:fontFamily="@font/orbitron_bold"
+                android:shadowColor="#8835D7FF"
+                android:shadowRadius="16"
                 android:text="– GB / – GB"
-                android:textColor="@color/text_main"
-                android:textSize="24sp"
-                android:textStyle="bold" />
+                android:textColor="@color/neon_cyan"
+                android:textSize="26sp" />
 
-            <TextView
-        android:shadowColor="#00000000"
-        android:shadowRadius="12"
-                android:id="@+id/ramFreeText"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:textColor="@color/text_main"
-                android:textSize="15sp"
-                android:textStyle="bold" />
+                android:layout_marginTop="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-            <TextView
-        android:shadowColor="#00000000"
-        android:shadowRadius="12"
-                android:id="@+id/appsCountText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="Launched apps: –"
-                android:textColor="@color/text_main"
-                android:textSize="15sp"
-                android:textStyle="bold" />
+                <TextView
+                    android:id="@+id/ramFreeText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/rajdhani_bold"
+                    android:letterSpacing="0.06"
+                    android:paddingStart="12dp"
+                    android:paddingTop="3dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="3dp"
+                    android:textColor="@color/accent_green"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:id="@+id/appsCountText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="14dp"
+                    android:fontFamily="@font/rajdhani_bold"
+                    android:letterSpacing="0.06"
+                    android:text="LAUNCHED APPS: –"
+                    android:textColor="@color/neon_cyan"
+                    android:textSize="15sp" />
+            </LinearLayout>
     </LinearLayout>
 </LinearLayout>

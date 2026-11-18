@@ -8,6 +8,8 @@
         <item name="colorAccent">@color/neon_pink</item>
         <item name="android:textColorPrimary">@color/text_main</item>
         <item name="alertDialogTheme">@style/Theme.AppSweep.Dialog</item>
+        <item name="android:fontFamily">@font/rajdhani_semibold</item>
+        <item name="fontFamily">@font/rajdhani_semibold</item>
     </style>
 
     <!-- Same look but transparent, for the Quick Sweep launcher / tile / shortcut -->
