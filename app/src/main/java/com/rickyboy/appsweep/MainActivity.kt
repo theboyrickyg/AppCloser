@@ -416,11 +416,18 @@ class MainActivity : AppCompatActivity() {
                     statusButton2.text = "Connect"
                     statusButton2.setOnClickListener { checkConnection(userAsked = true) }
                 } else {
-                    statusText.text = "RAPID TOTAL CLEAN SETUP · STEP 2 OF 2\n\n" +
-                        "Tap \"★ Pair automatically\". App Closer switches on Wireless debugging (you need Wi-Fi), " +
-                        "finds the 6-digit code and enters it for you. Don't touch the screen for a few seconds." +
-                        (if (SweepAccessibilityService.isOn()) "" else
-                            "\n\nThe first time, it asks you to switch App Closer on in Accessibility. One time only.")
+                    statusText.text = android.text.SpannableStringBuilder().apply {
+                        append("RAPID TOTAL CLEAN SETUP · STEP 2 OF 2\n\n")
+                        append("Tap \"★ Pair automatically\". App Closer switches on Wireless debugging (you need Wi-Fi), " +
+                            "finds the 6-digit code and enters it for you.\n\n")
+                        val st = length
+                        append("✋ DON'T TOUCH THE SCREEN while it pairs.\nIt takes about 10 seconds and App Closer does all the tapping. " +
+                            "Touching the screen can stop it working.")
+                        setSpan(android.text.style.ForegroundColorSpan(getColor(R.color.accent_red)), st, length, 0)
+                        setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), st, length, 0)
+                        if (!SweepAccessibilityService.isOn())
+                            append("\n\nThe first time, it asks you to switch App Closer on in Accessibility. One time only.")
+                    }
                     statusText2.visibility = View.VISIBLE
                     statusText2.text = "Doing it yourself: Developer options → switch on Wireless debugging → " +
                         "\"Pair device with pairing code\". Pull down your notifications and type the 6-digit code " +
@@ -585,7 +592,7 @@ class MainActivity : AppCompatActivity() {
      * that order: try → unlock → switch on.
      */
     private fun showEasySetup() {
-        val title = if (pairHelper) "RAPID SETUP · STEP 2 OF 2\nSwitch on auto-pairing" else "BASIC CLEAN SETUP"
+        val title = if (pairHelper) "RAPID SETUP · STEP 2 OF 2\nSwitch on auto-pairing (after this, don't touch the screen while it pairs)" else "BASIC CLEAN SETUP"
         val word = if (pairHelper) "PART" else "STEP"
         statusCard.visibility = View.VISIBLE
         hideSetupExtras()
@@ -715,7 +722,7 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
             val svc = SweepAccessibilityService.instance ?: return@setOnClickListener
-            toast("Setting up… don't touch the screen for a few seconds")
+            toast("Pairing… please don't touch the screen")
             val started = svc.autoPair { error ->
                 if (error == null) {
                     toast("Paired ✓ Connecting…")

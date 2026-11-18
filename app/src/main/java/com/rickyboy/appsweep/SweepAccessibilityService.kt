@@ -418,13 +418,17 @@ class SweepAccessibilityService : AccessibilityService() {
         if (busy) return false
         busy = true
         scope.launch {
+            withContext(Dispatchers.Main) { showPairOverlay() }
             val error = try { runAutoPair() } catch (e: Exception) { "Something went wrong. Try again." }
             withContext(Dispatchers.Main) {
+                setPairStatus(if (error == null) "Paired ✓" else "Finishing…")
                 repeat(3) { performGlobalAction(GLOBAL_ACTION_BACK); delay(300) }
                 startActivity(
                     Intent(this@SweepAccessibilityService, MainActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 )
+                delay(300)
+                hidePairOverlay()
                 onResult(error)
             }
             busy = false
@@ -433,31 +437,100 @@ class SweepAccessibilityService : AccessibilityService() {
     }
 
     private suspend fun runAutoPair(): String? {
+        if (!onWifi()) return "Connect to Wi-Fi first: pairing works over Wi-Fi."
+        status("Opening Developer options…")
         withContext(Dispatchers.Main) {
             startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
-        delay(1200)
-        val wd = findWithScroll(pairTexts.wireless) ?: return "Couldn't find Wireless debugging. Is Developer options switched on?"
+        delay(900)
+        status("Finding Wireless debugging…")
+        val wd = waitFor(2500) { find(pairTexts.wireless) } ?: findWithScroll(pairTexts.wireless, 25)
+            ?: return "Couldn't find Wireless debugging. Is Developer options switched on?"
         click(wd)
-        delay(1200)
-        // Switch it on if it's off
+        // wait for the Wireless debugging page (its switch or the pairing row)
+        waitFor(3000) { walkFind(1) { it.isCheckable }.firstOrNull() ?: find(pairTexts.pairCode) }
+        delay(300)
+
+        // Switch it on if it's off, and allow this Wi-Fi network
         val main = walkFind(4) { it.isCheckable }.firstOrNull()
         if (main != null && !main.isChecked) {
+            status("Switching on Wireless debugging…")
             click(main)
-            delay(1200)
-            waitFor(2500) { find(pairTexts.allow) ?: findConfirm() }?.let { click(it); delay(1200) }
+            waitFor(3000) { find(pairTexts.allow) ?: findConfirm() }?.let { click(it) }
+            // wait until the pairing options appear
+            waitFor(4000) { find(pairTexts.pairCode)?.takeIf { isEnabled(it) } }
         }
-        val pair = findWithScroll(pairTexts.pairCode) ?: return "Couldn't find \"Pair device with pairing code\". Is Wi-Fi on?"
-        click(pair)
-        val code: String = waitFor<String>(5000) { _ ->
-            val node: AccessibilityNodeInfo? = walkFind(1) { n ->
-                val t = label(n)
-                t.length <= 9 && t.count { c -> c.isDigit() } == 6 && t.all { c -> c.isDigit() || c == ' ' }
-            }.firstOrNull()
-            if (node == null) null else label(node).filter { c -> c.isDigit() }
-        } ?: return "Couldn't read the pairing code from the screen."
-        // The pairing screen must stay open while pairing
-        return withContext(Dispatchers.IO) { Adb.pair(applicationContext, code) }
+
+        // Read the code and pair; one more go with a fresh code if the first doesn't take
+        var lastError: String? = null
+        for (attempt in 0 until 2) {
+            status("Getting the pairing code…")
+            val pair = waitFor(1500) { find(pairTexts.pairCode) } ?: findWithScroll(pairTexts.pairCode, 8)
+                ?: return "Couldn't find \"Pair device with pairing code\". Is Wi-Fi on?"
+            click(pair)
+            val code: String = waitFor<String>(6000) { _ ->
+                val node: AccessibilityNodeInfo? = walkFind(1) { n ->
+                    val t = label(n)
+                    t.length <= 9 && t.count { c -> c.isDigit() } == 6 && t.all { c -> c.isDigit() || c == ' ' }
+                }.firstOrNull()
+                if (node == null) null else label(node).filter { c -> c.isDigit() }
+            } ?: return "Couldn't read the pairing code from the screen."
+            status("Pairing…")
+            // The pairing box must stay open while pairing
+            lastError = withContext(Dispatchers.IO) { Adb.pair(applicationContext, code) }
+            if (lastError == null) return null
+            // close the code box and try once more with a new code
+            withContext(Dispatchers.Main) { performGlobalAction(GLOBAL_ACTION_BACK) }
+            delay(900)
+        }
+        return lastError
+    }
+
+    private fun onWifi(): Boolean = try {
+        val cm = getSystemService(android.net.ConnectivityManager::class.java)
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+        caps == null || caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) ||
+            caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET)
+    } catch (_: Exception) {
+        true
+    }
+
+    // ---------- "Don't touch the screen" cover while pairing ----------
+
+    private var pairOverlay: View? = null
+
+    private fun showPairOverlay() {
+        if (pairOverlay != null) return
+        try {
+            val v = LayoutInflater.from(this).inflate(R.layout.overlay_pairing, null)
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                // touchable on purpose: it soaks up taps so nothing interrupts the pairing
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT
+            )
+            (getSystemService(WINDOW_SERVICE) as WindowManager).addView(v, params)
+            pairOverlay = v
+        } catch (_: Exception) {
+            pairOverlay = null
+        }
+    }
+
+    private fun setPairStatus(text: String) {
+        pairOverlay?.findViewById<TextView>(R.id.pairStatus)?.text = text
+    }
+
+    private suspend fun status(text: String) = withContext(Dispatchers.Main) { setPairStatus(text) }
+
+    private fun hidePairOverlay() {
+        val v = pairOverlay ?: return
+        try {
+            (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(v)
+        } catch (_: Exception) {
+        }
+        pairOverlay = null
     }
 
     private inner class PairTexts {
