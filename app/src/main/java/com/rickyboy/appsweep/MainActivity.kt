@@ -228,8 +228,8 @@ class MainActivity : AppCompatActivity() {
             if (++titleTaps >= 7) {
                 titleTaps = 0
                 when (Unlock.toggleOwnerUnlock(this)) {
-                    true -> toast("Owner unlock ON")
-                    false -> toast("Owner unlock OFF")
+                    true -> toast("Unlocked (test mode)")
+                    false -> toast("Locked: paywall test mode. Tap 7 times again to unlock.")
                     null -> Unit
                 }
             }

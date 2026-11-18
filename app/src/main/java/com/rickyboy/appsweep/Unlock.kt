@@ -30,8 +30,9 @@ object Unlock {
 
     // ---------- Free cleans + lifetime totals ----------
 
+    /** Test builds (GitHub) start unlocked; tap the title 7 times to lock them and try the paywall. */
     fun isUnlocked(ctx: Context): Boolean =
-        prefs(ctx).getBoolean("bought", false) || prefs(ctx).getBoolean("owner", false)
+        prefs(ctx).getBoolean("bought", false) || prefs(ctx).getBoolean("owner", BuildConfig.TEST_BUILD)
 
     fun cleansUsed(ctx: Context): Int = prefs(ctx).getInt("cleans_used", 0)
     fun freeCleansLeft(ctx: Context): Int = (FREE_CLEANS - cleansUsed(ctx)).coerceAtLeast(0)
@@ -71,7 +72,7 @@ object Unlock {
     /** Returns the new state, or null if not allowed (Play Store copies). */
     fun toggleOwnerUnlock(ctx: Context): Boolean? {
         if (installedFromPlay(ctx)) return null
-        val now = !prefs(ctx).getBoolean("owner", false)
+        val now = !prefs(ctx).getBoolean("owner", BuildConfig.TEST_BUILD)
         prefs(ctx).edit().putBoolean("owner", now).apply()
         return now
     }

@@ -18,6 +18,10 @@ android {
         targetSdk = 34
         versionCode = buildNumber
         versionName = "1.0.$buildNumber"
+        // GitHub test builds come fully unlocked. Build with -PplayStore=true for the Play Store,
+        // which switches on the 5 free cleans + paywall.
+        val playStore = (project.findProperty("playStore") as String?) == "true"
+        buildConfigField("boolean", "TEST_BUILD", (!playStore).toString())
     }
 
     signingConfigs {
