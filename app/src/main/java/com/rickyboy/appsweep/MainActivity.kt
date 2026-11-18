@@ -935,13 +935,17 @@ class MainActivity : AppCompatActivity() {
             if (clearRecents) setOwnRecentsHidden(true)
             val t0 = android.os.SystemClock.elapsedRealtime()
             var cleanSecs = 0f
+            val speedo = openRapidScreen()
             val result = withContext(Dispatchers.IO) {
                 sweeper.sweepAll(
                     apps,
                     onProgress = { pct ->
                         // time to close everything and clear caches (not the wait before measuring RAM)
                         if (pct >= 90 && cleanSecs == 0f) cleanSecs = (android.os.SystemClock.elapsedRealtime() - t0) / 1000f
-                        runOnUiThread { cleanGauge.setProgress(pct.toFloat()) }
+                        runOnUiThread {
+                            cleanGauge.setProgress(pct.toFloat())
+                            speedo?.progress = pct.toFloat()
+                        }
                     },
                     onClosed = { pkg -> runOnUiThread { removeFromList(pkg) } },
                     clearRecents = clearRecents
@@ -950,7 +954,8 @@ class MainActivity : AppCompatActivity() {
             if (clearRecents) setOwnRecentsHidden(false)
             cleanGauge.finish()
             showSweepDone(result)
-            showRapidAllClean(cleanSecs)
+            if (cleanSecs == 0f) cleanSecs = (android.os.SystemClock.elapsedRealtime() - t0) / 1000f
+            finishRapidScreen(cleanSecs)
         }
     }
 
@@ -1272,21 +1277,38 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** Rapid Total Clean finished: the happy ram, smoking from the speed, says ALL CLEAN. */
-    private fun showRapidAllClean(seconds: Float) {
-        if (isFinishing) return
+    private var rapidDialog: android.app.Dialog? = null
+    private var rapidView: RapidCleanView? = null
+
+    /** Rapid Total Clean: speedometer + heating-up ram while it cleans. */
+    private fun openRapidScreen(): RapidCleanView? {
+        if (isFinishing) return null
         val d = android.app.Dialog(this, android.R.style.Theme_Translucent_NoTitleBar)
+        val v = RapidCleanView(this)
         val frame = android.widget.FrameLayout(this).apply {
-            setBackgroundColor(0xE607070F.toInt())
-            val v = RapidCleanView(this@MainActivity).also { it.seconds = seconds }
+            setBackgroundColor(0xF007070F.toInt())
             val wpx = (minOf(resources.displayMetrics.widthPixels, resources.displayMetrics.heightPixels) * 0.9f).toInt()
             addView(v, android.widget.FrameLayout.LayoutParams(wpx, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
                 android.view.Gravity.CENTER))
-            setOnClickListener { d.dismiss() }
+            setOnClickListener { if (v.isDone) d.dismiss() }   // tap to close once it's finished
         }
         d.setContentView(frame)
+        d.setCancelable(false)
         d.show()
-        frame.postDelayed({ if (d.isShowing) d.dismiss() }, 4500)
+        rapidDialog = d
+        rapidView = v
+        return v
+    }
+
+    /** Cleaning done: ALL CLEAN, the time it took, then it closes by itself. */
+    private fun finishRapidScreen(seconds: Float) {
+        val v = rapidView ?: return
+        val d = rapidDialog ?: return
+        v.finish(seconds)
+        d.setCancelable(true)
+        v.postDelayed({ if (d.isShowing) d.dismiss() }, 4500)
+        rapidView = null
+        rapidDialog = null
     }
 
     private fun setOwnRecentsHidden(hidden: Boolean) {

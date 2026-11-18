@@ -5,184 +5,220 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.RadialGradient
+import android.graphics.RectF
 import android.graphics.Shader
+import android.graphics.SweepGradient
 import android.graphics.Typeface
 import android.os.SystemClock
 import android.util.AttributeSet
 import android.view.View
-import kotlin.math.PI
+import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Rapid Total Clean finished: the happy blue-eyed ram pops up with his horns on fire
- * from the speed, and "ALL CLEAN" underneath.
+ * The Rapid Total Clean screen. While it cleans, a sports-car speedometer revs up and the
+ * ram's horns heat up to a glowing amber. When it's done: "ALL CLEAN" and the time it took.
  */
 class RapidCleanView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null
 ) : View(context, attrs) {
 
     private companion object {
-        // points on the all_clean_ram picture (600 x 481)
-        // along the tops of his horns (left horn; the right one is the mirror image)
-        val HORN = arrayOf(
-            floatArrayOf(28f, 230f), floatArrayOf(30f, 160f), floatArrayOf(55f, 95f), floatArrayOf(95f, 45f),
-            floatArrayOf(150f, 18f), floatArrayOf(210f, 22f), floatArrayOf(250f, 55f)
-        )
-                const val FLAME_EVERY = 4L
+        const val MAX_SPEED = 320f
+        const val START_DEG = 150f      // where 0 sits on the dial
+        const val SWEEP_DEG = 240f      // 0 → MAX_SPEED
+        const val REDLINE = 260f
     }
 
-    private val ram: Bitmap = BitmapFactory.decodeResource(resources, R.drawable.all_clean_ram,
-        BitmapFactory.Options().apply { inScaled = false })
-    private val start = SystemClock.uptimeMillis()
-    /** How long the clean took, shown under ALL CLEAN (0 = not known). */
-    var seconds: Float = 0f
-    private val sub = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
+    private val opts = BitmapFactory.Options().apply { inScaled = false }
+    private val ram: Bitmap = BitmapFactory.decodeResource(resources, R.drawable.all_clean_ram, opts)
+    private val hot: Bitmap = BitmapFactory.decodeResource(resources, R.drawable.all_clean_ram_hot, opts)
+    private val halo: Bitmap = BitmapFactory.decodeResource(resources, R.drawable.horn_halo, opts)
     private val img = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        textAlign = Paint.Align.CENTER
-        letterSpacing = 0.12f
+    private val t = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
+    private val r = RectF()
+    private val start = SystemClock.uptimeMillis()
+
+    /** 0..100 while cleaning. */
+    var progress = 0f
+    private var doneAt = 0L
+    private var seconds = 0f
+    private var shown = 0f              // the needle's speed, eased towards its target
+
+    /** Cleaning finished in [secs] seconds. */
+    fun finish(secs: Float) {
+        seconds = secs
+        doneAt = SystemClock.uptimeMillis()
     }
+
+    val isDone get() = doneAt > 0
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec)
-        setMeasuredDimension(w, (w * 1.38f).toInt())
-    }
-
-    /** A repeatable "random" number 0..1 for puff n. */
-    private fun rnd(n: Long, salt: Int): Float {
-        var x = n * 374761393L + salt * 668265263L
-        x = (x xor (x ushr 13)) * 1274126177L
-        return ((x xor (x ushr 16)) and 0xFFFF).toFloat() / 0xFFFF
+        setMeasuredDimension(w, (w * 1.56f).toInt())
     }
 
     override fun onDraw(canvas: Canvas) {
-        val now = SystemClock.uptimeMillis() - start
+        val now = SystemClock.uptimeMillis()
         val w = width.toFloat()
-        val s = w * 0.86f / ram.width                 // picture scale
+        val done = doneAt > 0
+        val sinceDone = if (done) (now - doneAt).toFloat() else 0f
+
+        // ---- the ram, horns heating up as it goes ----
+        val s = w * 0.72f / ram.width
         val ox = (w - ram.width * s) / 2
-        val oy = w * 0.20f   // room above for the flames
+        val oy = w * 0.07f
+        val heat = if (done) 1f else (0.15f + 0.85f * progress / 100f)
+        val pulse = 0.82f + 0.18f * sin(now / 260f)
+        val glow = (heat * pulse).coerceIn(0f, 1f)
 
-        // pop in with a little overshoot
-        val pop = (now / 380f).coerceAtMost(1f)
-        val sc = if (pop < 1f) (sin(pop * PI * 0.75) / sin(PI * 0.75 * 0.75)).toFloat().coerceAtMost(1.08f) else 1f
+        val pad = (halo.width - ram.width) / 2f
+        img.alpha = (glow * 255).toInt()
+        r.set(ox - pad * s, oy - pad * s, ox + (ram.width + pad) * s, oy + (ram.height + pad) * s)
+        canvas.drawBitmap(halo, null, r, img)
+        r.set(ox, oy, ox + ram.width * s, oy + ram.height * s)
+        img.alpha = 255
+        canvas.drawBitmap(ram, null, r, img)
+        img.alpha = (heat * (0.75f + 0.25f * pulse) * 255).toInt().coerceIn(0, 255)
+        canvas.drawBitmap(hot, null, r, img)
+        img.alpha = 255
 
-        canvas.save()
-        canvas.scale(sc, sc, w / 2, oy + ram.height * s / 2)
+        // ---- ALL CLEAN (pops in when done) ----
+        val ty = oy + ram.height * s + w * 0.12f
+        t.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        t.letterSpacing = 0.12f
+        t.style = Paint.Style.FILL
+        if (done) {
+            val pop = (sinceDone / 300f).coerceAtMost(1f)
+            val sc = if (pop < 1f) 0.6f + 0.5f * pop else 1f
+            canvas.save()
+            canvas.scale(sc, sc, w / 2, ty)
+            t.textSize = w * 0.12f
+            t.style = Paint.Style.STROKE
+            t.strokeWidth = w * 0.018f
+            t.color = Color.rgb(8, 40, 20)
+            canvas.drawText("ALL CLEAN", w / 2, ty, t)
+            t.style = Paint.Style.FILL
+            t.color = Color.rgb(0, 230, 118)
+            canvas.drawText("ALL CLEAN", w / 2, ty, t)
+            canvas.restore()
+        } else {
+            t.textSize = w * 0.07f
+            t.color = Color.rgb(255, 170, 60)
+            canvas.drawText("RAPID CLEANING…", w / 2, ty - w * 0.02f, t)
+        }
 
-        // flames licking up behind his horns, then the brighter part over the top of them
-        drawFire(canvas, now, ox, oy, s, 1.0f)
-        canvas.drawBitmap(ram, null, android.graphics.RectF(ox, oy, ox + ram.width * s, oy + ram.height * s), img)
-        drawFire(canvas, now, ox, oy, s, 0.5f)
-        canvas.restore()
-
-        // ALL CLEAN
-        val ty = oy + ram.height * s + w * 0.17f
-        text.textSize = w * 0.12f
-        text.style = Paint.Style.STROKE
-        text.strokeWidth = w * 0.018f
-        text.color = Color.rgb(8, 40, 20)
-        canvas.drawText("ALL CLEAN", w / 2, ty, text)
-        text.style = Paint.Style.FILL
-        text.color = Color.rgb(0, 230, 118)
-        canvas.drawText("ALL CLEAN", w / 2, ty, text)
-
-        // how rapid it was, and that the ram is on fire
-        sub.typeface = Typeface.DEFAULT
-        sub.textSize = w * 0.05f
-        sub.color = Color.WHITE
-        val line1 = if (seconds > 0f) "Everything closed in " + String.format(java.util.Locale.UK, "%.1f", seconds) + " seconds"
-            else "Everything closed in seconds"
-        canvas.drawText(line1, w / 2, ty + w * 0.10f, sub)
-        sub.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        sub.textSize = w * 0.06f
-        sub.color = Color.rgb(255, 138, 30)
-        canvas.drawText("So rapid, this ram is on fire! 🔥", w / 2, ty + w * 0.19f, sub)
+        // ---- the speedometer ----
+        val target = if (done) {
+            // eases back off the redline once it's finished
+            MAX_SPEED * (0.9f - 0.08f * (sinceDone / 1200f).coerceAtMost(1f))
+        } else {
+            val base = MAX_SPEED * (0.25f + 0.72f * progress / 100f)
+            base + sin(now / 45f) * 6f + sin(now / 17f) * 3f      // engine shake
+        }
+        shown += (target - shown) * 0.12f
+        val elapsed = if (done) seconds else (now - start) / 1000f
+        drawSpeedo(canvas, w / 2, ty + w * 0.40f, w * 0.31f, shown, elapsed, done)
 
         if (isShown) postInvalidateOnAnimation()
     }
 
-    private val add = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.ADD)
+    private fun angleFor(speed: Float) = START_DEG + SWEEP_DEG * (speed / MAX_SPEED).coerceIn(0f, 1.02f)
 
-    /** A flame tongue, 1 tall: pointed tip at the top, round belly at the bottom. */
-    private val tongue = android.graphics.Path().apply {
-        moveTo(0f, -1f)
-        cubicTo(0.30f, -0.55f, 0.48f, -0.05f, 0.30f, 0.22f)
-        cubicTo(0.18f, 0.40f, -0.18f, 0.40f, -0.30f, 0.22f)
-        cubicTo(-0.48f, -0.05f, -0.30f, -0.55f, 0f, -1f)
-        close()
-    }
+    private fun drawSpeedo(canvas: Canvas, cx: Float, cy: Float, rad: Float, speed: Float, secs: Float, done: Boolean) {
+        p.style = Paint.Style.FILL
 
-    // three kinds of flame: big dim outer tongues, orange middles, small white-hot cores.
-    // Each has a few colour stages as it cools on the way up.
-    private val kinds = arrayOf(
-        // height, width scale, life ms, rise, base alpha
-        floatArrayOf(115f, 0.90f, 720f, 95f, 0.75f),
-        floatArrayOf(82f, 0.80f, 560f, 75f, 0.90f),
-        floatArrayOf(44f, 0.75f, 380f, 40f, 1.00f)
-    )
-    private val kindColors = arrayOf(
-        intArrayOf(0xFFFF5A12.toInt(), 0xFFE23A0C.toInt(), 0xFFB8200A.toInt(), 0xFF7A1206.toInt()),
-        intArrayOf(0xFFFFA224.toInt(), 0xFFFF7A16.toInt(), 0xFFF0480E.toInt(), 0xFFB82A0A.toInt()),
-        intArrayOf(0xFFFFF4C8.toInt(), 0xFFFFE07A.toInt(), 0xFFFFB43A.toInt(), 0xFFFF8A1E.toInt())
-    )
-    private val shaders = Array(3) { k ->
-        Array(4) { c ->
-            val col = kindColors[k][c]
-            RadialGradient(0f, 0.12f, 0.95f,
-                intArrayOf(col, (col and 0x00FFFFFF) or (0xAA shl 24), col and 0x00FFFFFF),
-                floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
-        }
-    }
-
-    /** Fire along both horns. */
-    private fun drawFire(canvas: Canvas, now: Long, ox: Float, oy: Float, s: Float, strength: Float) {
-        p.xfermode = add
-        val maxLife = 720f
-        val first = ((now - maxLife) / FLAME_EVERY).toLong().coerceAtLeast(0)
-        val last = now / FLAME_EVERY
-        for (n in first..last) {
-            val kind = when {
-                rnd(n, 9) < 0.34f -> 0
-                rnd(n, 9) < 0.72f -> 1
-                else -> 2
-            }
-            val spec = kinds[kind]
-            val age = now - n * FLAME_EVERY
-            if (age < 0 || age > spec[2]) continue
-            val t = age / spec[2]
-            // a spot along the top of a horn
-            val seg = (rnd(n, 1) * (HORN.size - 1)).toInt().coerceAtMost(HORN.size - 2)
-            val f = rnd(n, 2)
-            var bx = HORN[seg][0] + (HORN[seg + 1][0] - HORN[seg][0]) * f
-            val by = HORN[seg][1] + (HORN[seg + 1][1] - HORN[seg][1]) * f
-            val right = rnd(n, 3) > 0.5f
-            if (right) bx = 600f - bx
-            // rise, flicker and sway like real flame
-            val sway = sin(now / 95f + n * 1.3f) * 6f * t + sin(now / 47f + n) * 2.5f
-            val x = bx + sway
-            val y = by + 8f - spec[3] * t * (0.8f + rnd(n, 4) * 0.5f)
-            val flick = 0.85f + 0.25f * sin(now / 38f + n * 2.1f)
-            val h = spec[0] * (1f - 0.55f * t) * flick * (0.75f + rnd(n, 5) * 0.5f)
-            val wScale = spec[1] * (1f - 0.25f * t)
-            val a = (if (t < 0.15f) t / 0.15f else 1f - (t - 0.15f) / 0.85f) * spec[4] * strength
-            val stage = (t * 4).toInt().coerceIn(0, 3)
-
-            canvas.save()
-            canvas.translate(ox + x * s, oy + y * s)
-            canvas.rotate(sway * 1.6f + (if (right) 4f else -4f))
-            canvas.scale(h * s * wScale, h * s)
-            p.shader = shaders[kind][stage]
-            p.alpha = (a * 255).toInt().coerceIn(0, 255)
-            canvas.drawPath(tongue, p)
-            canvas.restore()
-        }
+        // chrome bezel
+        p.shader = SweepGradient(cx, cy,
+            intArrayOf(0xFF6E7380.toInt(), 0xFFE9ECF2.toInt(), 0xFF5A5F6B.toInt(), 0xFFCDD2DA.toInt(), 0xFF6E7380.toInt()), null)
+        canvas.drawCircle(cx, cy, rad * 1.08f, p)
         p.shader = null
-        p.alpha = 255
-        p.xfermode = null
+        p.color = Color.rgb(12, 12, 16)
+        canvas.drawCircle(cx, cy, rad * 1.025f, p)
+        // dial face
+        p.shader = RadialGradient(cx, cy - rad * 0.3f, rad * 1.2f,
+            intArrayOf(0xFF2A2C34.toInt(), 0xFF101117.toInt(), 0xFF050508.toInt()), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
+        canvas.drawCircle(cx, cy, rad, p)
+        p.shader = null
+
+        // red zone
+        p.style = Paint.Style.STROKE
+        p.strokeCap = Paint.Cap.BUTT
+        p.strokeWidth = rad * 0.07f
+        p.color = Color.rgb(220, 30, 30)
+        r.set(cx - rad * 0.86f, cy - rad * 0.86f, cx + rad * 0.86f, cy + rad * 0.86f)
+        canvas.drawArc(r, angleFor(REDLINE), angleFor(MAX_SPEED) - angleFor(REDLINE), false, p)
+
+        // glowing arc up to the needle
+        p.strokeWidth = rad * 0.035f
+        p.color = Color.argb(200, 255, 150, 40)
+        r.set(cx - rad * 0.93f, cy - rad * 0.93f, cx + rad * 0.93f, cy + rad * 0.93f)
+        canvas.drawArc(r, START_DEG, angleFor(speed) - START_DEG, false, p)
+
+        // ticks and numbers
+        t.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        t.letterSpacing = 0f
+        t.style = Paint.Style.FILL
+        t.textSize = rad * 0.13f
+        var v = 0
+        while (v <= MAX_SPEED.toInt()) {
+            val a = Math.toRadians(angleFor(v.toFloat()).toDouble())
+            val major = v % 40 == 0
+            val r0 = rad * (if (major) 0.70f else 0.76f)
+            val r1 = rad * 0.82f
+            p.strokeWidth = if (major) rad * 0.025f else rad * 0.012f
+            p.color = if (v >= REDLINE) Color.rgb(255, 70, 60) else Color.WHITE
+            canvas.drawLine(cx + cos(a).toFloat() * r0, cy + sin(a).toFloat() * r0,
+                cx + cos(a).toFloat() * r1, cy + sin(a).toFloat() * r1, p)
+            if (major) {
+                val rt = rad * 0.55f
+                t.color = if (v >= REDLINE) Color.rgb(255, 80, 70) else Color.rgb(235, 235, 240)
+                canvas.drawText(v.toString(), cx + cos(a).toFloat() * rt, cy + sin(a).toFloat() * rt + t.textSize * 0.36f, t)
+            }
+            v += 10
+        }
+
+        // label
+        t.textSize = rad * 0.10f
+        t.letterSpacing = 0.2f
+        t.color = Color.rgb(150, 150, 165)
+        canvas.drawText("CLEAN SPEED", cx, cy - rad * 0.30f, t)
+
+        // digital time readout
+        t.letterSpacing = 0.05f
+        t.textSize = rad * 0.22f
+        t.color = if (done) Color.rgb(0, 230, 118) else Color.rgb(255, 170, 60)
+        canvas.drawText(String.format(Locale.UK, "%.1f s", secs), cx, cy + rad * 0.50f, t)
+        t.textSize = rad * 0.09f
+        t.letterSpacing = 0.2f
+        t.color = Color.rgb(150, 150, 165)
+        canvas.drawText(if (done) "TIME TO CLEAN" else "CLEANING", cx, cy + rad * 0.66f, t)
+
+        // needle
+        val a = Math.toRadians(angleFor(speed).toDouble())
+        val nx = cx + cos(a).toFloat() * rad * 0.88f
+        val ny = cy + sin(a).toFloat() * rad * 0.88f
+        val bx = cx - cos(a).toFloat() * rad * 0.16f
+        val by = cy - sin(a).toFloat() * rad * 0.16f
+        p.strokeCap = Paint.Cap.ROUND
+        p.strokeWidth = rad * 0.07f
+        p.color = Color.argb(70, 255, 60, 30)
+        canvas.drawLine(bx, by, nx, ny, p)          // glow
+        p.strokeWidth = rad * 0.03f
+        p.shader = LinearGradient(bx, by, nx, ny, Color.rgb(160, 10, 10), Color.rgb(255, 70, 40), Shader.TileMode.CLAMP)
+        canvas.drawLine(bx, by, nx, ny, p)
+        p.shader = null
+
+        // hub
+        p.style = Paint.Style.FILL
+        p.shader = RadialGradient(cx - rad * 0.03f, cy - rad * 0.03f, rad * 0.11f,
+            intArrayOf(0xFFE0E3EA.toInt(), 0xFF50545E.toInt(), 0xFF1A1B20.toInt()), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
+        canvas.drawCircle(cx, cy, rad * 0.10f, p)
+        p.shader = null
     }
 }
