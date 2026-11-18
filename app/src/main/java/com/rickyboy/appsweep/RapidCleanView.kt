@@ -6,7 +6,6 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Path
 import android.graphics.RadialGradient
 import android.graphics.Shader
 import android.graphics.Typeface
@@ -18,8 +17,8 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Rapid Total Clean finished: the happy ram pops up with sparkling blue eyes, smoke pouring
- * off his head and horns from the speed, and "ALL CLEAN" underneath.
+ * Rapid Total Clean finished: the happy blue-eyed ram pops up with his horns on fire
+ * from the speed, and "ALL CLEAN" underneath.
  */
 class RapidCleanView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null
@@ -27,14 +26,13 @@ class RapidCleanView @JvmOverloads constructor(
 
     private companion object {
         // points on the all_clean_ram picture (600 x 481)
-        val EYES = arrayOf(floatArrayOf(213f, 200f), floatArrayOf(382f, 202f))
-        // where smoke comes off: horn tops, top of the head, outer horns
-        val VENTS = arrayOf(
-            floatArrayOf(70f, 90f), floatArrayOf(530f, 90f), floatArrayOf(30f, 220f), floatArrayOf(570f, 220f),
-            floatArrayOf(160f, 30f), floatArrayOf(440f, 30f), floatArrayOf(300f, 70f), floatArrayOf(60f, 320f), floatArrayOf(540f, 320f)
+        // along the tops of his horns (left horn; the right one is the mirror image)
+        val HORN = arrayOf(
+            floatArrayOf(28f, 230f), floatArrayOf(30f, 160f), floatArrayOf(55f, 95f), floatArrayOf(95f, 45f),
+            floatArrayOf(150f, 18f), floatArrayOf(210f, 22f), floatArrayOf(250f, 55f)
         )
-        const val PUFF_LIFE = 1500f
-        const val PUFF_EVERY = 55L
+        const val FLAME_LIFE = 650f
+        const val FLAME_EVERY = 4L
     }
 
     private val ram: Bitmap = BitmapFactory.decodeResource(resources, R.drawable.all_clean_ram,
@@ -42,7 +40,6 @@ class RapidCleanView @JvmOverloads constructor(
     private val start = SystemClock.uptimeMillis()
     private val img = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val star = Path()
     private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         textAlign = Paint.Align.CENTER
@@ -75,13 +72,10 @@ class RapidCleanView @JvmOverloads constructor(
         canvas.save()
         canvas.scale(sc, sc, w / 2, oy + ram.height * s / 2)
 
-        // smoke behind him, then a thinner layer of it drifting over his horns
-        drawSmoke(canvas, now, ox, oy, s, 1f)
+        // flames licking up behind his horns, then the brighter part over the top of them
+        drawFire(canvas, now, ox, oy, s, 0.55f)
         canvas.drawBitmap(ram, null, android.graphics.RectF(ox, oy, ox + ram.width * s, oy + ram.height * s), img)
-        drawSmoke(canvas, now, ox, oy, s, 0.6f)
-
-        // sparkling blue eyes
-        drawEyes(canvas, now, ox, oy, s)
+        drawFire(canvas, now, ox, oy, s, 0.35f)
         canvas.restore()
 
         // ALL CLEAN
@@ -98,60 +92,40 @@ class RapidCleanView @JvmOverloads constructor(
         if (isShown) postInvalidateOnAnimation()
     }
 
-    private fun drawSmoke(canvas: Canvas, now: Long, ox: Float, oy: Float, s: Float, strength: Float) {
-        val first = ((now - PUFF_LIFE) / PUFF_EVERY).toLong().coerceAtLeast(0)
-        val last = now / PUFF_EVERY
+    private val add = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.ADD)
+
+    /** Fire along both horns: flickering flame blobs that rise, shrink and cool from yellow to red. */
+    private fun drawFire(canvas: Canvas, now: Long, ox: Float, oy: Float, s: Float, strength: Float) {
+        p.xfermode = add
+        val first = ((now - FLAME_LIFE) / FLAME_EVERY).toLong().coerceAtLeast(0)
+        val last = now / FLAME_EVERY
         for (n in first..last) {
-            val age = now - n * PUFF_EVERY
-            if (age < 0 || age > PUFF_LIFE) continue
-            val t = age / PUFF_LIFE
-            val vent = VENTS[(rnd(n, 1) * VENTS.size).toInt().coerceAtMost(VENTS.size - 1)]
-            val drift = (vent[0] - 300f) / 300f       // outer vents drift outwards
-            val x = vent[0] + (drift * 170f + (rnd(n, 2) - 0.5f) * 70f) * t
-            val y = vent[1] - (80f + rnd(n, 3) * 70f) * t
-            val r = (16f + 70f * t) * (0.7f + rnd(n, 4) * 0.6f)
-            val a = (if (t < 0.15f) t / 0.15f else 1f - (t - 0.15f) / 0.85f) * 0.85f * strength
+            val age = now - n * FLAME_EVERY
+            if (age < 0 || age > FLAME_LIFE) continue
+            val t = age / FLAME_LIFE
+            // a spot along the horn top
+            val seg = (rnd(n, 1) * (HORN.size - 1)).toInt().coerceAtMost(HORN.size - 2)
+            val f = rnd(n, 2)
+            var bx = HORN[seg][0] + (HORN[seg + 1][0] - HORN[seg][0]) * f
+            val by = HORN[seg][1] + (HORN[seg + 1][1] - HORN[seg][1]) * f
+            if (rnd(n, 3) > 0.5f) bx = 600f - bx           // right horn
+            val x = bx + sin(t * 9f + n) * 7f * t
+            val y = by - (90f + rnd(n, 4) * 80f) * t + 10f
+            val r = (40f * (1f - t) + 10f) * (0.7f + rnd(n, 5) * 0.6f)
+            val a = (if (t < 0.12f) t / 0.12f else 1f - (t - 0.12f) / 0.88f) * strength
+            // yellow → orange → red as it rises
+            val g = (230 - 190 * t).toInt().coerceIn(30, 230)
+            val b = (120 - 160 * t).toInt().coerceIn(0, 120)
             val cx = ox + x * s
             val cy = oy + y * s
             val rr = r * s
-            val grey = (175 + rnd(n, 5) * 50).toInt()
             p.shader = RadialGradient(cx, cy, rr,
-                Color.argb((a * 255).toInt(), grey, grey, grey + 8), Color.argb(0, grey, grey, grey),
+                Color.argb((a * 255).toInt().coerceIn(0, 255), 255, g, b), Color.argb(0, 255, g / 2, 0),
                 Shader.TileMode.CLAMP)
             canvas.drawCircle(cx, cy, rr, p)
         }
         p.shader = null
+        p.xfermode = null
     }
 
-    private fun drawEyes(canvas: Canvas, now: Long, ox: Float, oy: Float, s: Float) {
-        for ((i, e) in EYES.withIndex()) {
-            val ph = now / 420f + i * 1.7f
-            val tw = (0.55f + 0.45f * sin(ph)).coerceAtLeast(0f)
-            val cx = ox + e[0] * s
-            val cy = oy + e[1] * s
-            val glow = 26f * s * (0.8f + tw * 0.6f)
-            p.shader = RadialGradient(cx, cy, glow * 1.6f,
-                Color.argb((150 * tw).toInt(), 130, 205, 255), Color.argb(0, 130, 205, 255), Shader.TileMode.CLAMP)
-            canvas.drawCircle(cx, cy, glow * 1.6f, p)
-            p.shader = null
-            drawStar(canvas, cx + 6f * s, cy - 6f * s, (34f + 26f * tw) * s, now / 900f + i, Color.argb((235 * tw).toInt() + 20, 235, 248, 255))
-        }
-    }
-
-    /** A 4-point twinkle. */
-    private fun drawStar(canvas: Canvas, cx: Float, cy: Float, r: Float, rot: Float, color: Int) {
-        star.reset()
-        for (k in 0 until 8) {
-            val ang = rot + k * PI.toFloat() / 4
-            val rr = if (k % 2 == 0) r else r * 0.16f
-            val x = cx + cos(ang) * rr
-            val y = cy + sin(ang) * rr
-            if (k == 0) star.moveTo(x, y) else star.lineTo(x, y)
-        }
-        star.close()
-        p.color = color
-        canvas.drawPath(star, p)
-        p.color = Color.WHITE
-        canvas.drawCircle(cx, cy, r * 0.12f, p)
-    }
 }
