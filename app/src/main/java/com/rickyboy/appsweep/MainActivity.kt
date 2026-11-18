@@ -479,7 +479,7 @@ class MainActivity : AppCompatActivity() {
             "Closes your apps one by one through Android's own settings while the ram does the work. " +
                 "Takes a few seconds per app. Quick 3-step setup, nothing technical."
         findViewById<TextView>(R.id.rapidDesc).text =
-            "Closes every app at once in a couple of seconds, silently, and clears all caches together. " +
+            "Closes every app at once in a couple of seconds, silently, and clears all caches instantly. " +
                 "Uses Developer options and Wireless debugging. Save memory by turning off auto-start in selected apps. " +
                 "More advanced setup, but a rapid, in-depth total clean."
         basic.setOnClickListener {
