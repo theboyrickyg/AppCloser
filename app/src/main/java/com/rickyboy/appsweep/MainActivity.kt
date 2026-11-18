@@ -933,10 +933,16 @@ class MainActivity : AppCompatActivity() {
             val clearRecents = Prefs.clearRecents(this@MainActivity)
             // keep App Closer's own card out of the Recents wipe, so it isn't closed mid-clean
             if (clearRecents) setOwnRecentsHidden(true)
+            val t0 = android.os.SystemClock.elapsedRealtime()
+            var cleanSecs = 0f
             val result = withContext(Dispatchers.IO) {
                 sweeper.sweepAll(
                     apps,
-                    onProgress = { pct -> runOnUiThread { cleanGauge.setProgress(pct.toFloat()) } },
+                    onProgress = { pct ->
+                        // time to close everything and clear caches (not the wait before measuring RAM)
+                        if (pct >= 90 && cleanSecs == 0f) cleanSecs = (android.os.SystemClock.elapsedRealtime() - t0) / 1000f
+                        runOnUiThread { cleanGauge.setProgress(pct.toFloat()) }
+                    },
                     onClosed = { pkg -> runOnUiThread { removeFromList(pkg) } },
                     clearRecents = clearRecents
                 )
@@ -944,7 +950,7 @@ class MainActivity : AppCompatActivity() {
             if (clearRecents) setOwnRecentsHidden(false)
             cleanGauge.finish()
             showSweepDone(result)
-            showRapidAllClean()
+            showRapidAllClean(cleanSecs)
         }
     }
 
@@ -1267,12 +1273,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Rapid Total Clean finished: the happy ram, smoking from the speed, says ALL CLEAN. */
-    private fun showRapidAllClean() {
+    private fun showRapidAllClean(seconds: Float) {
         if (isFinishing) return
         val d = android.app.Dialog(this, android.R.style.Theme_Translucent_NoTitleBar)
         val frame = android.widget.FrameLayout(this).apply {
             setBackgroundColor(0xE607070F.toInt())
-            val v = RapidCleanView(this@MainActivity)
+            val v = RapidCleanView(this@MainActivity).also { it.seconds = seconds }
             val wpx = (minOf(resources.displayMetrics.widthPixels, resources.displayMetrics.heightPixels) * 0.9f).toInt()
             addView(v, android.widget.FrameLayout.LayoutParams(wpx, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
                 android.view.Gravity.CENTER))
@@ -1280,7 +1286,7 @@ class MainActivity : AppCompatActivity() {
         }
         d.setContentView(frame)
         d.show()
-        frame.postDelayed({ if (d.isShowing) d.dismiss() }, 3800)
+        frame.postDelayed({ if (d.isShowing) d.dismiss() }, 4500)
     }
 
     private fun setOwnRecentsHidden(hidden: Boolean) {

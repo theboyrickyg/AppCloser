@@ -31,13 +31,15 @@ class RapidCleanView @JvmOverloads constructor(
             floatArrayOf(28f, 230f), floatArrayOf(30f, 160f), floatArrayOf(55f, 95f), floatArrayOf(95f, 45f),
             floatArrayOf(150f, 18f), floatArrayOf(210f, 22f), floatArrayOf(250f, 55f)
         )
-        const val FLAME_LIFE = 650f
-        const val FLAME_EVERY = 4L
+                const val FLAME_EVERY = 4L
     }
 
     private val ram: Bitmap = BitmapFactory.decodeResource(resources, R.drawable.all_clean_ram,
         BitmapFactory.Options().apply { inScaled = false })
     private val start = SystemClock.uptimeMillis()
+    /** How long the clean took, shown under ALL CLEAN (0 = not known). */
+    var seconds: Float = 0f
+    private val sub = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
     private val img = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
     private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -48,7 +50,7 @@ class RapidCleanView @JvmOverloads constructor(
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec)
-        setMeasuredDimension(w, (w * 1.05f).toInt())
+        setMeasuredDimension(w, (w * 1.38f).toInt())
     }
 
     /** A repeatable "random" number 0..1 for puff n. */
@@ -63,7 +65,7 @@ class RapidCleanView @JvmOverloads constructor(
         val w = width.toFloat()
         val s = w * 0.86f / ram.width                 // picture scale
         val ox = (w - ram.width * s) / 2
-        val oy = w * 0.10f
+        val oy = w * 0.20f   // room above for the flames
 
         // pop in with a little overshoot
         val pop = (now / 380f).coerceAtMost(1f)
@@ -73,9 +75,9 @@ class RapidCleanView @JvmOverloads constructor(
         canvas.scale(sc, sc, w / 2, oy + ram.height * s / 2)
 
         // flames licking up behind his horns, then the brighter part over the top of them
-        drawFire(canvas, now, ox, oy, s, 0.55f)
+        drawFire(canvas, now, ox, oy, s, 1.0f)
         canvas.drawBitmap(ram, null, android.graphics.RectF(ox, oy, ox + ram.width * s, oy + ram.height * s), img)
-        drawFire(canvas, now, ox, oy, s, 0.35f)
+        drawFire(canvas, now, ox, oy, s, 0.5f)
         canvas.restore()
 
         // ALL CLEAN
@@ -89,43 +91,98 @@ class RapidCleanView @JvmOverloads constructor(
         text.color = Color.rgb(0, 230, 118)
         canvas.drawText("ALL CLEAN", w / 2, ty, text)
 
+        // how rapid it was, and that the ram is on fire
+        sub.typeface = Typeface.DEFAULT
+        sub.textSize = w * 0.05f
+        sub.color = Color.WHITE
+        val line1 = if (seconds > 0f) "Everything closed in " + String.format(java.util.Locale.UK, "%.1f", seconds) + " seconds"
+            else "Everything closed in seconds"
+        canvas.drawText(line1, w / 2, ty + w * 0.10f, sub)
+        sub.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        sub.textSize = w * 0.06f
+        sub.color = Color.rgb(255, 138, 30)
+        canvas.drawText("So rapid, this ram is on fire! 🔥", w / 2, ty + w * 0.19f, sub)
+
         if (isShown) postInvalidateOnAnimation()
     }
 
     private val add = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.ADD)
 
-    /** Fire along both horns: flickering flame blobs that rise, shrink and cool from yellow to red. */
+    /** A flame tongue, 1 tall: pointed tip at the top, round belly at the bottom. */
+    private val tongue = android.graphics.Path().apply {
+        moveTo(0f, -1f)
+        cubicTo(0.30f, -0.55f, 0.48f, -0.05f, 0.30f, 0.22f)
+        cubicTo(0.18f, 0.40f, -0.18f, 0.40f, -0.30f, 0.22f)
+        cubicTo(-0.48f, -0.05f, -0.30f, -0.55f, 0f, -1f)
+        close()
+    }
+
+    // three kinds of flame: big dim outer tongues, orange middles, small white-hot cores.
+    // Each has a few colour stages as it cools on the way up.
+    private val kinds = arrayOf(
+        // height, width scale, life ms, rise, base alpha
+        floatArrayOf(115f, 0.90f, 720f, 95f, 0.75f),
+        floatArrayOf(82f, 0.80f, 560f, 75f, 0.90f),
+        floatArrayOf(44f, 0.75f, 380f, 40f, 1.00f)
+    )
+    private val kindColors = arrayOf(
+        intArrayOf(0xFFFF5A12.toInt(), 0xFFE23A0C.toInt(), 0xFFB8200A.toInt(), 0xFF7A1206.toInt()),
+        intArrayOf(0xFFFFA224.toInt(), 0xFFFF7A16.toInt(), 0xFFF0480E.toInt(), 0xFFB82A0A.toInt()),
+        intArrayOf(0xFFFFF4C8.toInt(), 0xFFFFE07A.toInt(), 0xFFFFB43A.toInt(), 0xFFFF8A1E.toInt())
+    )
+    private val shaders = Array(3) { k ->
+        Array(4) { c ->
+            val col = kindColors[k][c]
+            RadialGradient(0f, 0.12f, 0.95f,
+                intArrayOf(col, (col and 0x00FFFFFF) or (0xAA shl 24), col and 0x00FFFFFF),
+                floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
+        }
+    }
+
+    /** Fire along both horns. */
     private fun drawFire(canvas: Canvas, now: Long, ox: Float, oy: Float, s: Float, strength: Float) {
         p.xfermode = add
-        val first = ((now - FLAME_LIFE) / FLAME_EVERY).toLong().coerceAtLeast(0)
+        val maxLife = 720f
+        val first = ((now - maxLife) / FLAME_EVERY).toLong().coerceAtLeast(0)
         val last = now / FLAME_EVERY
         for (n in first..last) {
+            val kind = when {
+                rnd(n, 9) < 0.34f -> 0
+                rnd(n, 9) < 0.72f -> 1
+                else -> 2
+            }
+            val spec = kinds[kind]
             val age = now - n * FLAME_EVERY
-            if (age < 0 || age > FLAME_LIFE) continue
-            val t = age / FLAME_LIFE
-            // a spot along the horn top
+            if (age < 0 || age > spec[2]) continue
+            val t = age / spec[2]
+            // a spot along the top of a horn
             val seg = (rnd(n, 1) * (HORN.size - 1)).toInt().coerceAtMost(HORN.size - 2)
             val f = rnd(n, 2)
             var bx = HORN[seg][0] + (HORN[seg + 1][0] - HORN[seg][0]) * f
             val by = HORN[seg][1] + (HORN[seg + 1][1] - HORN[seg][1]) * f
-            if (rnd(n, 3) > 0.5f) bx = 600f - bx           // right horn
-            val x = bx + sin(t * 9f + n) * 7f * t
-            val y = by - (90f + rnd(n, 4) * 80f) * t + 10f
-            val r = (40f * (1f - t) + 10f) * (0.7f + rnd(n, 5) * 0.6f)
-            val a = (if (t < 0.12f) t / 0.12f else 1f - (t - 0.12f) / 0.88f) * strength
-            // yellow → orange → red as it rises
-            val g = (230 - 190 * t).toInt().coerceIn(30, 230)
-            val b = (120 - 160 * t).toInt().coerceIn(0, 120)
-            val cx = ox + x * s
-            val cy = oy + y * s
-            val rr = r * s
-            p.shader = RadialGradient(cx, cy, rr,
-                Color.argb((a * 255).toInt().coerceIn(0, 255), 255, g, b), Color.argb(0, 255, g / 2, 0),
-                Shader.TileMode.CLAMP)
-            canvas.drawCircle(cx, cy, rr, p)
+            val right = rnd(n, 3) > 0.5f
+            if (right) bx = 600f - bx
+            // rise, flicker and sway like real flame
+            val sway = sin(now / 95f + n * 1.3f) * 6f * t + sin(now / 47f + n) * 2.5f
+            val x = bx + sway
+            val y = by + 8f - spec[3] * t * (0.8f + rnd(n, 4) * 0.5f)
+            val flick = 0.85f + 0.25f * sin(now / 38f + n * 2.1f)
+            val h = spec[0] * (1f - 0.55f * t) * flick * (0.75f + rnd(n, 5) * 0.5f)
+            val wScale = spec[1] * (1f - 0.25f * t)
+            val a = (if (t < 0.15f) t / 0.15f else 1f - (t - 0.15f) / 0.85f) * spec[4] * strength
+            val stage = (t * 4).toInt().coerceIn(0, 3)
+
+            canvas.save()
+            canvas.translate(ox + x * s, oy + y * s)
+            canvas.rotate(sway * 1.6f + (if (right) 4f else -4f))
+            canvas.scale(h * s * wScale, h * s)
+            p.shader = shaders[kind][stage]
+            p.alpha = (a * 255).toInt().coerceIn(0, 255)
+            canvas.drawPath(tongue, p)
+            canvas.restore()
         }
         p.shader = null
+        p.alpha = 255
         p.xfermode = null
     }
-
 }
