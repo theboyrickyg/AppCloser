@@ -114,21 +114,17 @@ class HotButtonDrawable(private val density: Float) : Drawable() {
 
     private fun drawGauge(canvas: Canvas, cx: Float, cy: Float, rad: Float, side: Float) {
         val d = density
-        // tyre tracks: two dashed arcs sweeping from under the dial in towards the middle
-        line.strokeWidth = 3.2f * d
-        line.pathEffect = DashPathEffect(floatArrayOf(2.2f * d, 1.6f * d), 0f)
+        // burning tyre tracks: two treads sweeping from under the dial up towards the middle
+        val inward = -side                                // towards the middle of the button
         for (k in 0..1) {
-            val off = k * 4.5f * d
+            val off = k * 8.5f * d
             path.reset()
-            path.moveTo(cx - side * (rad * 0.2f), cy + rad + 4 * d - off)
-            path.cubicTo(cx + side * rad * 0.6f, cy + rad + 2 * d - off,
-                cx + side * rad * 1.6f, cy + rad * 0.2f - off,
-                cx + side * rad * 2.1f, cy - rad * 0.9f - off)
-            line.color = withAlpha(0xFFFF9A40.toInt(), 110 - k * 40)
-            canvas.drawPath(path, line)
+            path.moveTo(cx - inward * rad * 0.5f, cy + rad + 7 * d - off * 0.4f)
+            path.cubicTo(cx + inward * rad * 0.9f, cy + rad + 6 * d - off,
+                cx + inward * rad * 1.7f, cy + rad * 0.1f - off,
+                cx + inward * rad * 2.0f, cy - rad * 1.05f - off * 0.3f)
+            drawTread(canvas, inward)
         }
-        line.pathEffect = null
-
         // dial
         p.color = 0xE0140703.toInt()
         canvas.drawCircle(cx, cy, rad, p)
@@ -156,6 +152,45 @@ class HotButtonDrawable(private val density: Float) : Drawable() {
         txt.textSize = rad * 0.24f
         txt.clearShadowLayer()
         canvas.drawText("km/h", cx, cy + rad * 0.62f, txt)
+    }
+
+    private val measure = android.graphics.PathMeasure()
+    private val pos = FloatArray(2)
+    private val tan = FloatArray(2)
+
+    /** A glowing tyre tread along [path]: hot glow, orange band, bright chevron blocks, fading at the far end. */
+    private fun drawTread(canvas: Canvas, side: Float) {
+        val d = density
+        val tw = 6.5f * d
+        line.strokeCap = Paint.Cap.ROUND
+        line.strokeWidth = tw * 2.4f
+        line.color = withAlpha(0xFFFF6A10.toInt(), 50)
+        canvas.drawPath(path, line)                       // glow
+        line.strokeWidth = tw
+        line.color = 0xFFC2410C.toInt()
+        canvas.drawPath(path, line)                       // the band
+        line.strokeCap = Paint.Cap.BUTT
+        measure.setPath(path, false)
+        val len = measure.length
+        var at = 2 * d
+        line.strokeWidth = 1.7f * d
+        while (at < len) {
+            measure.getPosTan(at, pos, tan)
+            val f = 1f - at / len                         // brightest near the dial, fading out
+            val nx = -tan[1]
+            val ny = tan[0]
+            val hw = tw * 0.42f
+            val lean = 2.2f * d * side
+            line.color = withAlpha(if (f > 0.5f) 0xFFFFE08A.toInt() else 0xFFFFA53A.toInt(), (70 + 185 * f).toInt())
+            // chevron: two strokes meeting in the middle of the band
+            canvas.drawLine(pos[0] + nx * hw, pos[1] + ny * hw, pos[0] + tan[0] * lean, pos[1] + tan[1] * lean, line)
+            canvas.drawLine(pos[0] - nx * hw, pos[1] - ny * hw, pos[0] + tan[0] * lean, pos[1] + tan[1] * lean, line)
+            at += 4.2f * d
+        }
+        // flames trailing off the end of the track
+        measure.getPosTan(len, pos, tan)
+        val ang = Math.toDegrees(Math.atan2(tan[1].toDouble(), tan[0].toDouble())).toFloat()
+        drawFlame(canvas, pos[0], pos[1], ang, 16 * d)
     }
 
     /** One flame with its base at (x, y), pointing at [angle] degrees (0 = right, -90 = up). */
