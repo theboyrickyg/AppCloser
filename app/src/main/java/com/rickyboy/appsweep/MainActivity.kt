@@ -465,7 +465,69 @@ class MainActivity : AppCompatActivity() {
             showEasySetup()
             scrollToTop(statusCard)
         }
-        rapid.setOnClickListener {
+        rapid.setOnClickListener { showRapidIntro() }
+        basic.requestFocus()
+    }
+
+    /** Plain-English explanation of what Rapid switches on, and why it's safe. */
+    private fun rapidSafetyText(): CharSequence {
+        val sb = android.text.SpannableStringBuilder()
+        fun head(t: String) {
+            val st = sb.length
+            sb.append(t)
+            sb.setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), st, sb.length, 0)
+            sb.setSpan(android.text.style.ForegroundColorSpan(Hud.CYAN), st, sb.length, 0)
+        }
+        head("What does Rapid switch on?\n")
+        sb.append("Two hidden settings that are built into every Android phone: Developer options and Wireless debugging. " +
+            "They let App Closer use the same commands Android's own Settings uses to close apps and clear caches, " +
+            "so it can do everything at once in seconds.\n\n")
+        head("Will it mess up my phone?\n")
+        sb.append("No. Nothing is deleted, nothing is changed in your phone's system, and it doesn't root your phone or affect your warranty. " +
+            "Switching Developer options on just shows an extra menu in Settings. Your phone works exactly the same.\n\n")
+        head("Is it safe?\n")
+        sb.append("Yes. Wireless debugging only works on your Wi-Fi, and only with apps you've paired using the 6-digit code. " +
+            "Only App Closer is paired, so nothing else can connect.\n\n")
+        head("Can I undo it?\n")
+        sb.append("Any time: Settings → System → Developer options → switch it off at the top. " +
+            "App Closer then simply uses Basic Clean.\n\n")
+        head("Good to know\n")
+        sb.append("Android switches Wireless debugging off after a restart or a Wi-Fi change; App Closer switches it back on for you. " +
+            "A few banking apps don't like Developer options being on: if one complains, switch Developer options off while you bank.")
+        return sb
+    }
+
+    /** "Is this safe?" from inside the Rapid setup steps. */
+    private fun showRapidExplainer() {
+        AlertDialog.Builder(this)
+            .setTitle("About Rapid Total Clean")
+            .setMessage(rapidSafetyText())
+            .setPositiveButton("OK", null)
+            .show()
+    }
+
+    /** Before Rapid setup starts: what it uses, in plain words, then a clear choice. */
+    private fun showRapidIntro() {
+        statusCard.visibility = View.VISIBLE
+        hideSetupExtras()
+        resetStatusTextStyle()
+        statusText.text = android.text.SpannableStringBuilder("RAPID TOTAL CLEAN · BEFORE YOU START\n\n").append(rapidSafetyText())
+        statusButton.visibility = View.GONE
+        statusButton2.visibility = View.VISIBLE
+        statusButton2.text = "OK, start the setup →"
+        statusButton2.setOnClickListener { startRapidSetup() }
+        linkButton.visibility = View.VISIBLE
+        linkButton.text = "← No thanks, back to choose your Clean"
+        linkButton.setOnClickListener {
+            setupChoice = null
+            showChoice()
+        }
+        statusButton2.requestFocus()
+        scrollToTop(statusCard)
+    }
+
+    private fun startRapidSetup() {
+        run {
             setupChoice = "pro"
             resetStatusTextStyle()
             hideSetupExtras()
@@ -479,7 +541,6 @@ class MainActivity : AppCompatActivity() {
             }
             scrollToTop(statusCard)
         }
-        basic.requestFocus()
     }
 
     private fun resetStatusTextStyle() {
@@ -690,7 +751,7 @@ class MainActivity : AppCompatActivity() {
             stepText(
                 "RAPID TOTAL CLEAN SETUP · STEP 2 OF 2\n",
                 if (SweepAccessibilityService.isOn()) "Step 1 done ✓\n" else "",
-                "PART 2 OF 2 · Pair App Closer\n\n",
+                "PART 2 OF 2 · Pair App Closer   ", Pair(" Is this safe? ", { showRapidExplainer() }), "\n\n",
                 "1. Make sure you're on Wi-Fi.\n",
                 "2. Tap ", pairWord, warn
             )
@@ -735,7 +796,7 @@ class MainActivity : AppCompatActivity() {
         statusText.text = stepText(
             "RAPID TOTAL CLEAN SETUP · STEP 2 OF 2\n",
             if (SweepAccessibilityService.isOn()) "Step 1 done ✓\n" else "",
-            "PART 1 OF 2 · Switch on Developer options\n\n",
+            "PART 1 OF 2 · Switch on Developer options   ", Pair(" Is this safe? ", { showRapidExplainer() }), "\n\n",
             "1. Tap ", Pair("  About phone  ", { openSettings(Settings.ACTION_DEVICE_INFO_SETTINGS) }), "\n",
             if (samsung) "2. Tap \"Software information\", then find \"$rowName\". It looks like this:"
             else "2. Scroll to the bottom and find \"$rowName\". It looks like this:"
@@ -1309,24 +1370,7 @@ class MainActivity : AppCompatActivity() {
 
     /** ⚡ Rapid Total Clean: Developer options + pairing. Free to set up and try; then part of Pro. */
     private fun startInstantSetup() {
-        AlertDialog.Builder(this)
-            .setTitle("⚡ Rapid Total Clean")
-            .setMessage(
-                "Closes everything at once in a couple of seconds, silently, with no Settings pages opening. " +
-                    "It also shows RAM for every app and clears all caches at once.\n\n" +
-                    "It's for confident users: it uses Android's Developer options and Wireless debugging. " +
-                    "App Closer finds and enters the pairing code for you.\n\n" +
-                    "After a phone restart you may need to switch Wireless debugging back on. " +
-                    "Basic Clean still works whenever Rapid Total Clean isn't connected."
-            )
-            .setPositiveButton("Set it up") { _, _ ->
-                setupChoice = "pro"
-                instantLink.visibility = View.GONE
-                checkConnection(userAsked = false)
-                statusCard.post { scrollToTop(statusCard) }
-            }
-            .setNegativeButton("Not now", null)
-            .show()
+        showRapidIntro()
     }
 
     private fun scrollToTop(v: View) {
