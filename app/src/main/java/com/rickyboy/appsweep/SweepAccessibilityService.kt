@@ -619,11 +619,46 @@ class SweepAccessibilityService : AccessibilityService() {
         for (i in 0 until maxScrolls) {
             val hit: AccessibilityNodeInfo? = find(options)
             if (hit != null) return hit
-            val scroller: AccessibilityNodeInfo = walkFind(1) { n -> n.isScrollable }.firstOrNull() ?: return null
-            scroller.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
-            delay(450)
+            val before = screenSignature()
+            // Scroll the biggest scrolling list on screen. Newer Settings pages have more than one
+            // scrollable part (the top bar collapses), so the first one found may not move the list.
+            val scrollers = walkFind(10) { n -> n.isScrollable }
+                .sortedByDescending { n -> android.graphics.Rect().also { r -> n.getBoundsInScreen(r) }.let { it.width() * it.height() } }
+            var moved = false
+            for (sc in scrollers) {
+                if (sc.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)) {
+                    delay(450)
+                    if (screenSignature() != before) { moved = true; break }
+                }
+            }
+            if (!moved) {
+                // last resort: swipe up the screen like a finger would
+                val dm = resources.displayMetrics
+                swipeVertical(dm.widthPixels * 0.5f, dm.heightPixels * 0.78f, dm.heightPixels * 0.30f)
+                delay(500)
+                if (screenSignature() == before) return find(options)   // reached the bottom
+            }
         }
         return find(options)
+    }
+
+    /** A rough fingerprint of the words on screen, to tell whether a scroll did anything. */
+    private fun screenSignature(): String =
+        walkFind(40) { n -> !n.text.isNullOrEmpty() }.joinToString("|") { label(it) }
+
+    private suspend fun swipeVertical(x: Float, fromY: Float, toY: Float) {
+        val path = android.graphics.Path().apply { moveTo(x, fromY); lineTo(x, toY) }
+        val stroke = android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, 300)
+        val gesture = android.accessibilityservice.GestureDescription.Builder().addStroke(stroke).build()
+        val done = kotlinx.coroutines.CompletableDeferred<Unit>()
+        withContext(Dispatchers.Main) {
+            val ok = dispatchGesture(gesture, object : GestureResultCallback() {
+                override fun onCompleted(d: android.accessibilityservice.GestureDescription?) { done.complete(Unit) }
+                override fun onCancelled(d: android.accessibilityservice.GestureDescription?) { done.complete(Unit) }
+            }, null)
+            if (!ok) done.complete(Unit)
+        }
+        kotlinx.coroutines.withTimeoutOrNull(1200) { done.await() }
     }
 
     // ---------- Finding and pressing buttons ----------
@@ -677,9 +712,14 @@ class SweepAccessibilityService : AccessibilityService() {
     /** Every window's screen tree, the front one (e.g. a dialog) first. */
     private fun roots(): List<AccessibilityNodeInfo> {
         val out = ArrayList<AccessibilityNodeInfo>()
-        root()?.let { out.add(it) }
+        // never search App Closer's own cover screens: only the Settings pages underneath
+        fun ours(r: AccessibilityNodeInfo) = r.packageName?.toString() == packageName
+        root()?.let { if (!ours(it)) out.add(it) }
         try {
-            windows?.forEach { w -> w.root?.let { r -> if (out.none { it == r }) out.add(r) } }
+            windows?.forEach { w ->
+                if (w.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY) return@forEach
+                w.root?.let { r -> if (!ours(r) && out.none { it == r }) out.add(r) }
+            }
         } catch (_: Exception) {
         }
         return out
