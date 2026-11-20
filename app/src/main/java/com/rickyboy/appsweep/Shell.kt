@@ -58,11 +58,17 @@ object Shell {
             }
         }
 
+        // Wireless debugging (or Developer options) switched off by Android? Switch it back on.
+        if (Adb.hasWorkedBefore(ctx) && Adb.switchBackOn(ctx)) delay(2500)   // give it time to start listening
+
         if (!Adb.developerOptionsOn(ctx) && !Adb.hasWorkedBefore(ctx)) return@withContext Status.NEED_DEV_OPTIONS
 
         if (userAsked || Adb.hasWorkedBefore(ctx) || Adb.hasPaired(ctx)) {
             when (Adb.connect(ctx)) {
                 Adb.Result.CONNECTED -> {
+                    if (!Adb.canFixSettings(ctx)) {
+                        try { exec("pm grant ${ctx.packageName} android.permission.WRITE_SECURE_SETTINGS") } catch (_: Exception) { }
+                    }
                     readyListeners.forEach { it() }
                     return@withContext Status.READY
                 }

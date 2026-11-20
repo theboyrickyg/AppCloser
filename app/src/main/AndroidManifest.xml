@@ -9,6 +9,11 @@
     <!-- Talks to the device's own debugging service over a local connection -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Granted once over Rapid's own connection (not asked of the user): lets App Closer switch
+         Wireless debugging and Developer options back on when Android turns them off -->
+    <uses-permission
+        android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
     <!-- Setup notification where the phone pairing code is typed -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 

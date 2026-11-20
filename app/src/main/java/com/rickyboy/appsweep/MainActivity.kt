@@ -233,6 +233,7 @@ class MainActivity : AppCompatActivity() {
         }
         Unlock.connect(this)
         if (intent?.getBooleanExtra("show_unlock", false) == true) sweepButton.post { showUnlock() }
+        if (intent?.getBooleanExtra("rapid_done", false) == true) sweepButton.postDelayed({ consumePendingRapid() }, 400)
         // Owner copies (not from the Play Store): tap the title 7 times to unlock / lock again
         findViewById<View>(R.id.appTitle)?.setOnClickListener {
             val now = System.currentTimeMillis()
@@ -253,6 +254,7 @@ class MainActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         if (intent.getBooleanExtra("show_unlock", false)) showUnlock()
+        if (intent.getBooleanExtra("rapid_done", false)) consumePendingRapid()
     }
 
     override fun onResume() {
@@ -1002,8 +1004,6 @@ class MainActivity : AppCompatActivity() {
         startSweepUi()
         lifecycleScope.launch {
             val clearRecents = Prefs.clearRecents(this@MainActivity)
-            // keep App Closer's own card out of the Recents wipe, so it isn't closed mid-clean
-            if (clearRecents) setOwnRecentsHidden(true)
             val t0 = android.os.SystemClock.elapsedRealtime()
             var cleanSecs = 0f
             val result = withContext(Dispatchers.IO) {
@@ -1015,14 +1015,28 @@ class MainActivity : AppCompatActivity() {
                         runOnUiThread { cleanGauge.setProgress(pct.toFloat()) }
                     },
                     onClosed = { pkg -> runOnUiThread { removeFromList(pkg) } },
-                    clearRecents = clearRecents
+                    clearRecents = false     // done last, below: wiping Recents also closes App Closer's own window
                 )
             }
-            if (clearRecents) setOwnRecentsHidden(false)
             cleanGauge.finish()
-            showSweepDone(result)
             if (cleanSecs == 0f) cleanSecs = (android.os.SystemClock.elapsedRealtime() - t0) / 1000f
-            showRapidAllClean(cleanSecs)
+            if (clearRecents) {
+                // Save the result, then wipe Recents and reopen App Closer from the system side,
+                // so the results and the ALL CLEAN ram still show even though our own window was closed.
+                savePendingRapid(result, cleanSecs)
+                withContext(Dispatchers.IO) {
+                    Shell.exec(
+                        "nohup sh -c 'sleep 0.4; am clear-recent-apps; sleep 0.6; " +
+                            "am start -n $packageName/.MainActivity --ez rapid_done true' >/dev/null 2>&1 &"
+                    )
+                }
+                // if App Closer's window survived the wipe, show it here instead
+                kotlinx.coroutines.delay(3500)
+                consumePendingRapid()
+            } else {
+                showSweepDone(result)
+                showRapidAllClean(cleanSecs)
+            }
         }
     }
 
@@ -1403,6 +1417,30 @@ class MainActivity : AppCompatActivity() {
         d.setContentView(frame)
         d.show()
         frame.postDelayed({ if (d.isShowing) d.dismiss() }, 4500)
+    }
+
+    private fun savePendingRapid(r: SweepResult, secs: Float) {
+        prefs.edit()
+            .putBoolean("rapid_pending", true)
+            .putInt("rapid_closed", r.closed)
+            .putLong("rapid_ram", r.ramFreed)
+            .putLong("rapid_cache", r.cacheFreed)
+            .putFloat("rapid_secs", secs)
+            .putLong("rapid_at", System.currentTimeMillis())
+            .apply()
+    }
+
+    /** Shows a finished Rapid clean's results (once), e.g. after Recents wiping reopened the app. */
+    private fun consumePendingRapid() {
+        if (!prefs.getBoolean("rapid_pending", false)) return
+        val fresh = System.currentTimeMillis() - prefs.getLong("rapid_at", 0) < 60_000
+        val r = SweepResult(prefs.getInt("rapid_closed", 0), prefs.getLong("rapid_ram", 0), prefs.getLong("rapid_cache", 0))
+        val secs = prefs.getFloat("rapid_secs", 0f)
+        prefs.edit().putBoolean("rapid_pending", false).apply()
+        if (!fresh || isFinishing) return
+        cleanGauge.finish()
+        showSweepDone(r)
+        showRapidAllClean(secs)
     }
 
     private fun setOwnRecentsHidden(hidden: Boolean) {

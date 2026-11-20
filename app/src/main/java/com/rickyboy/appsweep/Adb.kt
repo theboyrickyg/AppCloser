@@ -106,6 +106,32 @@ object Adb {
         false
     }
 
+    /** App Closer was given the "change system settings" permission over Rapid's connection. */
+    fun canFixSettings(ctx: Context): Boolean =
+        ctx.checkSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+
+    /**
+     * Android switches Wireless debugging off after a restart or a Wi-Fi change (and some phones
+     * switch Developer options off too). With the permission above, App Closer quietly switches
+     * them back on. Returns true if it changed anything.
+     */
+    fun switchBackOn(ctx: Context): Boolean {
+        if (!canFixSettings(ctx)) return false
+        var changed = false
+        try {
+            val cr = ctx.contentResolver
+            if (Settings.Global.getInt(cr, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) != 1) {
+                Settings.Global.putInt(cr, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 1); changed = true
+            }
+            if (Build.VERSION.SDK_INT >= 30 && Settings.Global.getInt(cr, "adb_wifi_enabled", 0) != 1) {
+                Settings.Global.putInt(cr, "adb_wifi_enabled", 1); changed = true
+            }
+        } catch (_: Exception) {
+        }
+        return changed
+    }
+
     fun wirelessDebuggingOn(ctx: Context): Boolean =
         Build.VERSION.SDK_INT >= 30 && Settings.Global.getInt(ctx.contentResolver, "adb_wifi_enabled", 0) == 1
 
