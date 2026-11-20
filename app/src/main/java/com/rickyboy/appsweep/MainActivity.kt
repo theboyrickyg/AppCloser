@@ -1208,7 +1208,7 @@ class MainActivity : AppCompatActivity() {
         allCleanView.visibility = View.GONE
         sweepButton.visibility = View.VISIBLE
         sweepButton.isEnabled = false
-        sweepButton.background = Hud.button(this, Hud.GREEN)   // green while it cleans
+        setSweepLook(cleaning = true)   // green while it cleans
         sweepButton.text = "[ CLEANING… ]"
         resultText.visibility = View.GONE
         resultRow.visibility = View.GONE
@@ -1218,7 +1218,7 @@ class MainActivity : AppCompatActivity() {
     private fun endSweepUi() {
         busy = false
         sweepButton.isEnabled = true
-        sweepButton.background = Hud.button(this, Hud.BLUE)
+        setSweepLook(cleaning = false)
         sweepButton.text = sweepLabel()
         cleanGauge.reset()
     }
@@ -1265,7 +1265,7 @@ class MainActivity : AppCompatActivity() {
         } else if (result.closed > 0) {
             // closed some (e.g. a single app) but others are still open: no "All clean!"
             resultText.visibility = View.GONE
-            sweepButton.background = Hud.button(this, Hud.BLUE)
+            setSweepLook(cleaning = false)
             sweepButton.text = sweepLabel()
             cleanGauge.reset()
         } else {
@@ -1277,7 +1277,7 @@ class MainActivity : AppCompatActivity() {
                 "Nothing needed closing. Everything was already clean."
             }
             resultText.visibility = View.VISIBLE
-            sweepButton.background = Hud.button(this, Hud.BLUE)
+            setSweepLook(cleaning = false)
             sweepButton.text = sweepLabel()
             cleanGauge.reset()
         }
@@ -1293,7 +1293,7 @@ class MainActivity : AppCompatActivity() {
 
     /** Back to the normal pink button (after the happy ram has had its moment). */
     private fun showSweepButton() {
-        sweepButton.background = Hud.button(this, Hud.BLUE)
+        setSweepLook(cleaning = false)
         sweepButton.text = sweepLabel()
         if (allCleanView.visibility == View.VISIBLE) {
             allCleanView.animate().alpha(0f).setDuration(250).withEndAction {
@@ -1366,7 +1366,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.listPanel)?.background = Hud.panel(this)
         ramFreeText.background = HudDrawable(resources.displayMetrics.density, Hud.GREEN,
             0xFF0B2A1C.toInt(), 0xFF081E14.toInt(), cut = 7f, glow = false, accents = false)
-        sweepButton.background = Hud.button(this, Hud.BLUE)
+        setSweepLook(cleaning = false)
         closeX?.background = HudDrawable(resources.displayMetrics.density, Hud.RED,
             0xFF3A0C12.toInt(), 0xFF24070B.toInt(), cut = 7f, glow = false, accents = false)
         sweepButton.text = sweepLabel()
@@ -1380,6 +1380,7 @@ class MainActivity : AppCompatActivity() {
         // the upgrade: warm fiery orange, so it stands out and invites a tap
         instantLink.background = HudDrawable(resources.displayMetrics.density, 0xFFFF8A1E.toInt(),
             0xFF4A1E06.toInt(), 0xFF2A0F04.toInt(), cut = 16f)
+        look.skin?.let { applySkin(it) }
     }
 
     /** Close All, with the mode underneath so it's clear which clean it does. */
@@ -1403,6 +1404,59 @@ class MainActivity : AppCompatActivity() {
         sb.setSpan(android.text.style.RelativeSizeSpan(0.62f), st, sb.length, 0)
         sb.setSpan(android.text.style.ForegroundColorSpan(0xFFFFC08A.toInt()), st, sb.length, 0)
         return sb
+    }
+
+    private var skinHeader: SkinHeaderView? = null
+
+    /** The Close All button's look: themed picture, or the HUD blue (green while it cleans). */
+    private fun setSweepLook(cleaning: Boolean) {
+        val skin = Themes.look.skin
+        sweepButton.background = if (skin != null) {
+            android.graphics.drawable.BitmapDrawable(resources, android.graphics.BitmapFactory.decodeResource(
+                resources, if (cleaning) skin.rapid else skin.basic, android.graphics.BitmapFactory.Options().apply { inScaled = false }))
+        } else {
+            Hud.button(this, if (cleaning) Hud.GREEN else Hud.BLUE)
+        }
+    }
+
+    /** Illustrated theme: put the theme's pictures behind every part of the screen. */
+    private fun applySkin(skin: Skin) {
+        val d = resources.displayMetrics.density
+        fun pic(res: Int) = android.graphics.drawable.BitmapDrawable(resources,
+            android.graphics.BitmapFactory.decodeResource(resources, res, android.graphics.BitmapFactory.Options().apply { inScaled = false }))
+        findViewById<View>(R.id.mainScroll)?.setBackgroundResource(skin.background)
+        // top picture with the live RAM figure in its dial, instead of the two rams
+        (findViewById<View>(R.id.ramPanel) as? LinearLayout)?.let { panel ->
+            panel.removeAllViews()
+            panel.background = null
+            panel.setPadding(0, 0, 0, 0)
+            val v = SkinHeaderView(this, skin)
+            panel.addView(v, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+            skinHeader = v
+        }
+        sweepButton.background = pic(skin.basic)
+        sweepButton.setShadowLayer(6f, 0f, 2f, 0xFF000000.toInt())
+        // keep the words clear of the pictures at each end of the buttons
+        sweepButton.textSize = 18f
+        sweepButton.setPadding((58 * d).toInt(), sweepButton.paddingTop, (58 * d).toInt(), sweepButton.paddingBottom)
+        instantLink.textSize = 20f
+        instantLink.setPadding((62 * d).toInt(), instantLink.paddingTop, (62 * d).toInt(), instantLink.paddingBottom)
+        ramFreeText.textSize = 13f
+        appsCountText.textSize = 13f
+        instantLink.background = pic(skin.rapid)
+        (instantLink as? SpeedButton)?.fire = false
+        instantLink.setShadowLayer(6f, 0f, 2f, 0xFF000000.toInt())
+        findViewById<View>(R.id.listPanel)?.background = FrameDrawable(this, skin.list)
+        ramFreeText.background = pic(skin.tagFree)
+        ramFreeText.setTextColor(skin.tagFreeText)
+        ramFreeText.setPadding((44 * d).toInt(), (6 * d).toInt(), (18 * d).toInt(), (6 * d).toInt())
+        appsCountText.background = pic(skin.tagApps)
+        appsCountText.setTextColor(skin.tagAppsText)
+        appsCountText.setPadding((40 * d).toInt(), (6 * d).toInt(), (16 * d).toInt(), (6 * d).toInt())
+        closeX?.apply {
+            background = pic(skin.close)
+            text = ""
+        }
     }
 
     /** Pick a screen theme. Cyber Cyan is free; the rest come with Pro. */
@@ -1664,6 +1718,7 @@ class MainActivity : AppCompatActivity() {
         if (info.totalMem <= 0) return
         val used = info.totalMem - info.availMem
         ramGauge.setPercent(used * 100f / info.totalMem)
+        skinHeader?.percent = used * 100f / info.totalMem
         // Used = red, available = green, everything else white
         ramUsedText.text = colored(gb(used), Hud.RED, " / ", 0xFF5C7F99.toInt(), gb(info.totalMem), Hud.GREEN)
         ramFreeText.text = "${gb(info.availMem)} AVAILABLE"

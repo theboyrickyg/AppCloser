@@ -13,7 +13,8 @@ object Themes {
         val name: String,
         val edge: Int,          // panel edges, title, highlights
         val button: Int,        // the main Close All button (and first result box)
-        val background: Int     // circuit background picture
+        val background: Int,    // circuit background picture
+        val skin: Skin? = null  // illustrated themes: pictures for every part of the screen
     )
 
     val all = listOf(
@@ -21,7 +22,23 @@ object Themes {
         Look("inferno", "Inferno", 0xFFFF7A2E.toInt(), 0xFFE8342A.toInt(), R.drawable.bg_circuit_inferno),
         Look("toxic", "Toxic Green", 0xFF7CFF4F.toInt(), 0xFF1FBF5B.toInt(), R.drawable.bg_circuit_toxic),
         Look("royal", "Royal Purple", 0xFFD6A6FF.toInt(), 0xFF8E4DFF.toInt(), R.drawable.bg_circuit_royal),
-        Look("stealth", "Stealth", 0xFFE6ECF2.toInt(), 0xFF8A97A6.toInt(), R.drawable.bg_circuit_stealth)
+        Look("stealth", "Stealth", 0xFFE6ECF2.toInt(), 0xFF8A97A6.toInt(), R.drawable.bg_circuit_stealth),
+        Look("christmas", "🎄 Christmas", 0xFFFFD27A.toInt(), 0xFF1F9E4A.toInt(), R.drawable.xmas_bg,
+            Skin(
+                background = R.drawable.xmas_bg,
+                header = R.drawable.xmas_header,
+                dialX = 0.2946f, dialY = 0.462f, dialR = 0.124f,
+                basic = R.drawable.xmas_basic,
+                rapid = R.drawable.xmas_rapid,
+                list = R.drawable.xmas_list,
+                tagFree = R.drawable.xmas_tag_green,
+                tagApps = R.drawable.xmas_tag_gold,
+                close = R.drawable.xmas_close,
+                tagFreeText = 0xFFFFFFFF.toInt(),
+                tagAppsText = 0xFF4A2A08.toInt(),
+                dialText = 0xFFFFFFFF.toInt(),
+                dialLabel = 0xFFFFD27A.toInt()
+            ))
     )
 
     /** The look in use right now (set when the main screen opens). */

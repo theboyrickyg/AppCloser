@@ -20,9 +20,12 @@ class SpeedButton @JvmOverloads constructor(
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
     private val dp = resources.displayMetrics.density
     private val tongue = Path()
+    /** Off for illustrated themes, whose button pictures have their own decorations. */
+    var fire = true
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+        if (!fire) return
         val l = layout ?: return
         if (l.lineCount == 0) return
         val left = totalPaddingLeft + l.getLineLeft(0)
