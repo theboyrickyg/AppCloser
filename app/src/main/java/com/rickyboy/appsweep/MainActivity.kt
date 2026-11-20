@@ -599,7 +599,7 @@ class MainActivity : AppCompatActivity() {
                     "1. Tap ", Pair("  Accessibility  ", openAccessibility), "\n",
                     "2. Tap \"App Closer\" even though it is greyed out. It looks like this:"
                 )
-                stepImage.visibility = View.VISIBLE
+                showStepPicture(icon = true, title = "App Closer", sub = "Controlled by Restricted Setting", hint = "👆")
                 statusText2.visibility = View.VISIBLE
                 statusText2.text = "Tap it anyway. Access will be denied: tap Close.\n\n" +
                     "Press Back to return here."
@@ -691,25 +691,14 @@ class MainActivity : AppCompatActivity() {
         val text = if (devOptionsOn) {
             stepText(
                 "RAPID TOTAL CLEAN SETUP · STEP 2 OF 2\n",
-                if (SweepAccessibilityService.isOn()) "Step 1 done ✓\n\n" else "\n",
+                if (SweepAccessibilityService.isOn()) "Step 1 done ✓\n" else "",
+                "PART 2 OF 2 · Pair App Closer\n\n",
                 "1. Make sure you're on Wi-Fi.\n",
                 "2. Tap ", pairWord, warn
             )
         } else {
-            stepText(
-                "RAPID TOTAL CLEAN SETUP · STEP 2 OF 2\n",
-                if (SweepAccessibilityService.isOn()) "Step 1 done ✓\n\n" else "\n",
-                "First, Developer options need switching on (a hidden Android setting):\n\n",
-                "1. Tap ", Pair("  Switch on Developer options  ", { startAutoDeveloperOptions() }), "\n",
-                "App Closer opens About phone and taps \"Build number\" 7 times for you. ",
-                "If your phone asks for your PIN, enter it.\n\n",
-                "2. When you're back here, make sure you're on Wi-Fi, then tap ", pairWord, warn,
-                "\n\nIf the automatic switch doesn't work: tap ",
-                Pair("  About phone  ", { openSettings(Settings.ACTION_DEVICE_INFO_SETTINGS) }),
-                " and tap \"Build number\" 7 times yourself, until it says you're a developer. ",
-                "Samsung: it's under Software information. Xiaomi: tap \"OS version\" or \"MIUI version\". ",
-                "Then press Back to return here."
-            )
+            showDeveloperOptionsPart()
+            return
         }
         // the warning in bold red
         val sb = android.text.SpannableStringBuilder(text)
@@ -727,6 +716,50 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun developerOptionsOn(): Boolean = Adb.developerOptionsOn(this)
+
+    /** The picture of a Settings row under a step (App Closer greyed out, or Build number). */
+    private fun showStepPicture(icon: Boolean, title: String, sub: String, hint: String) {
+        stepImage.visibility = View.VISIBLE
+        findViewById<View>(R.id.stepImageIcon).visibility = if (icon) View.VISIBLE else View.GONE
+        findViewById<TextView>(R.id.stepImageTitle).text = title
+        findViewById<TextView>(R.id.stepImageSub).text = sub
+        findViewById<TextView>(R.id.stepImageHint).text = hint
+    }
+
+    /**
+     * Rapid step 2, part 1: switch on Developer options, as simply as the Accessibility steps.
+     * One button opens the right page, a picture shows what to tap, and it moves on by itself.
+     */
+    private fun showDeveloperOptionsPart() {
+        val samsung = Build.MANUFACTURER.equals("samsung", ignoreCase = true)
+        val xiaomi = Build.MANUFACTURER.lowercase().let { it.contains("xiaomi") || it.contains("redmi") || it.contains("poco") }
+        val rowName = if (xiaomi) "OS version" else "Build number"
+        statusText.text = stepText(
+            "RAPID TOTAL CLEAN SETUP · STEP 2 OF 2\n",
+            if (SweepAccessibilityService.isOn()) "Step 1 done ✓\n" else "",
+            "PART 1 OF 2 · Switch on Developer options\n\n",
+            "1. Tap ", Pair("  About phone  ", { openSettings(Settings.ACTION_DEVICE_INFO_SETTINGS) }), "\n",
+            if (samsung) "2. Tap \"Software information\", then find \"$rowName\". It looks like this:"
+            else "2. Scroll to the bottom and find \"$rowName\". It looks like this:"
+        )
+        showStepPicture(icon = false, title = rowName, sub = Build.DISPLAY, hint = "👆 ×7")
+        statusText2.visibility = View.VISIBLE
+        statusText2.text = "3. Tap it 7 times, quickly, until it says \"You are now a developer!\"\n" +
+            "4. If it asks for your PIN, enter it.\n\n" +
+            "Press Back to return here."
+        statusButton.visibility = View.GONE
+        statusButton2.visibility = View.VISIBLE
+        statusButton2.text = "Next step →"
+        statusButton2.setOnClickListener {
+            if (developerOptionsOn()) checkConnection(userAsked = false)
+            else toast("Developer options aren't on yet: tap $rowName 7 times")
+        }
+        codeRow.visibility = View.GONE
+        // still offer the hands-free way, quietly
+        linkButton.visibility = View.VISIBLE
+        linkButton.text = "Or let App Closer tap it for me"
+        linkButton.setOnClickListener { startAutoDeveloperOptions() }
+    }
 
     /** App Closer taps "Build number" 7 times for the user. */
     private fun startAutoDeveloperOptions() {

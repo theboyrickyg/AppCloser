@@ -108,8 +108,10 @@
             android:visibility="gone">
 
             <ImageView
+                android:id="@+id/stepImageIcon"
                 android:layout_width="36dp"
                 android:layout_height="36dp"
+                android:layout_marginEnd="16dp"
                 android:alpha="0.45"
                 android:contentDescription="App Closer icon"
                 android:src="@mipmap/ic_launcher" />
@@ -117,27 +119,31 @@
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
                 <TextView
+                    android:id="@+id/stepImageTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif"
                     android:text="App Closer"
                     android:textColor="#80FFFFFF"
                     android:textSize="17sp" />
 
                 <TextView
+                    android:id="@+id/stepImageSub"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:fontFamily="sans-serif"
                     android:text="Controlled by Restricted Setting"
                     android:textColor="#66FFFFFF"
                     android:textSize="13sp" />
             </LinearLayout>
 
             <TextView
+                android:id="@+id/stepImageHint"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="👆"
