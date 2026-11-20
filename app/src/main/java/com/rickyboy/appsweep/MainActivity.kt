@@ -1486,11 +1486,17 @@ class MainActivity : AppCompatActivity() {
         sweepButton.setShadowLayer(10f, 0f, 0f, 0xAA35D7FF.toInt())
     }
 
-    /** The hot Rapid look: orange glow, flames off the corners, a speedometer at each end. */
+    /** The hot Rapid look: Ricky's flaming button picture, with our own words on top. */
     private fun makeHot(b: android.widget.Button) {
         val d = resources.displayMetrics.density
-        b.background = HotButtonDrawable(d)
-        val side = (HotButtonDrawable.SIDE_DP * d).toInt()
+        fun pic(res: Int) = android.graphics.drawable.BitmapDrawable(resources,
+            android.graphics.BitmapFactory.decodeResource(resources, res, android.graphics.BitmapFactory.Options().apply { inScaled = false }))
+        b.background = android.graphics.drawable.StateListDrawable().apply {
+            addState(intArrayOf(android.R.attr.state_pressed), pic(R.drawable.btn_hot_pressed))
+            addState(intArrayOf(android.R.attr.state_focused), pic(R.drawable.btn_hot_pressed))
+            addState(intArrayOf(), pic(R.drawable.btn_hot))
+        }
+        val side = (62 * d).toInt()                      // keep the words between the two speedometers
         b.setPadding(side, (14 * d).toInt(), side, (14 * d).toInt())
         b.setShadowLayer(12f, 0f, 0f, 0xFFFF7A18.toInt())
         (b as? SpeedButton)?.fire = false
