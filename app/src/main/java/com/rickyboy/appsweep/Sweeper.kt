@@ -216,7 +216,7 @@ class Sweeper(private val ctx: Context) {
         if (Build.VERSION.SDK_INT < 26 || pkgs.isEmpty()) return emptySet()
         val op = if (Build.VERSION.SDK_INT >= 28) "RUN_ANY_IN_BACKGROUND" else "RUN_IN_BACKGROUND"
         // Asked once per app, then remembered (it only changes when App Closer changes it)
-        val unknown = pkgs.filter { it !in blockedKnown }
+        val unknown = pkgs.filter { !blockedKnown.containsKey(it) }
         if (unknown.isNotEmpty()) {
             val script = unknown.joinToString("; ") { "echo \"@@$it\"; appops get $it $op" }
             val found = HashSet<String>()
