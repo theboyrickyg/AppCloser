@@ -28,6 +28,20 @@
             android:textColor="@color/neon_cyan"
             android:textSize="21sp" />
 
+        <!-- Screen themes (Pro): small square in the other corner -->
+        <Button
+            android:id="@+id/themeButton"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="start|center_vertical"
+            android:contentDescription="Screen themes"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="0dp"
+            android:stateListAnimator="@null"
+            android:text="🎨"
+            android:textSize="17sp" />
+
         <!-- Close App Closer: small red square in the corner -->
         <Button
             android:id="@+id/closeX"

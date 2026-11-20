@@ -1349,6 +1349,18 @@ class MainActivity : AppCompatActivity() {
 
     /** The sci-fi HUD look: cut-corner neon panels and buttons. */
     private fun applyHudTheme() {
+        val look = Themes.load(this)
+        findViewById<View>(R.id.mainScroll)?.setBackgroundResource(look.background)
+        findViewById<TextView>(R.id.appTitle)?.apply {
+            setTextColor(look.edge)
+            setShadowLayer(14f * resources.displayMetrics.density / 2, 0f, 0f, (look.edge and 0x00FFFFFF) or 0xAA000000.toInt())
+        }
+        appsCountText.setTextColor(0xFFE6F7FF.toInt())
+        findViewById<Button>(R.id.themeButton)?.apply {
+            background = HudDrawable(resources.displayMetrics.density, look.edge,
+                0xFF0B1A28.toInt(), 0xFF081320.toInt(), cut = 7f, glow = false, accents = false)
+            setOnClickListener { showThemes() }
+        }
         findViewById<View>(R.id.ramPanel)?.background = Hud.panel(this)
         statusCard.background = Hud.panel(this)
         findViewById<View>(R.id.listPanel)?.background = Hud.panel(this)
@@ -1391,6 +1403,53 @@ class MainActivity : AppCompatActivity() {
         sb.setSpan(android.text.style.RelativeSizeSpan(0.62f), st, sb.length, 0)
         sb.setSpan(android.text.style.ForegroundColorSpan(0xFFFFC08A.toInt()), st, sb.length, 0)
         return sb
+    }
+
+    /** Pick a screen theme. Cyber Cyan is free; the rest come with Pro. */
+    private fun showThemes() {
+        val d = resources.displayMetrics.density
+        val pro = Unlock.isUnlocked(this)
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((20 * d).toInt(), (18 * d).toInt(), (20 * d).toInt(), (10 * d).toInt())
+        }
+        box.addView(TextView(this).apply {
+            text = "SCREEN THEMES"
+            textSize = 20f
+            setTextColor(0xFFE6F7FF.toInt())
+            setPadding(0, 0, 0, (6 * d).toInt())
+        })
+        if (!pro) box.addView(TextView(this).apply {
+            text = "Cyber Cyan is free. The other themes come with App Closer Pro."
+            textSize = 14f
+            setTextColor(0xFF7FA6BF.toInt())
+            setPadding(0, 0, 0, (8 * d).toInt())
+        })
+        val dialog = AlertDialog.Builder(this).setView(android.widget.ScrollView(this).apply { addView(box) }).create()
+        for (t in Themes.all) {
+            val locked = !pro && !Themes.isFree(t)
+            box.addView(Button(this).apply {
+                text = (if (t == Themes.look) "✓  " else "") + t.name + (if (locked) "   🔒 PRO" else "")
+                isAllCaps = false
+                textSize = 17f
+                setTextColor(t.edge)
+                stateListAnimator = null
+                background = HudDrawable(d, t.edge, 0xFF0B1A28.toInt(), 0xFF081320.toInt(), cut = 12f, accents = false)
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (60 * d).toInt())
+                    .apply { topMargin = (6 * d).toInt() }
+                setOnClickListener {
+                    dialog.dismiss()
+                    if (locked) {
+                        showUnlock()
+                    } else if (t != Themes.look) {
+                        Themes.choose(this@MainActivity, t)
+                        recreate()      // redraw everything in the new colours
+                    }
+                }
+            })
+        }
+        dialog.window?.setBackgroundDrawable(Hud.panel(this))
+        dialog.show()
     }
 
     /** "[ 05 ]" with the brackets in the box's colour. */

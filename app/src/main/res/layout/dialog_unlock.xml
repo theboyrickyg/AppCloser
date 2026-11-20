@@ -45,7 +45,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:lineSpacingExtra="6dp"
-            android:text="🔥  Rapid Total Clean: everything closed and every cache cleared in seconds\n✓  Block apps from auto-starting\n✓  Unlimited Basic cleans\n✓  Quick Sweep tile and shortcut\n✓  Works on your phone and TV\n✓  One payment. No subscription, no ads"
+            android:text="🔥  Rapid Total Clean: everything closed and every cache cleared in seconds\n✓  Block apps from auto-starting\n✓  Unlimited Basic cleans\n🎨  4 extra screen themes\n✓  Quick Sweep tile and shortcut\n✓  Works on your phone and TV\n✓  One payment. No subscription, no ads"
             android:textColor="@color/text_main"
             android:textSize="15sp" />
 

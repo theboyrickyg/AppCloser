@@ -139,8 +139,9 @@ class HudDrawable(
 
 /** The app's HUD colours and ready-made backgrounds. */
 object Hud {
-    const val CYAN = 0xFF35D7FF.toInt()
-    const val BLUE = 0xFF2E8BFF.toInt()
+    // these two follow the chosen screen theme (Cyber Cyan by default)
+    val CYAN: Int get() = Themes.look.edge
+    val BLUE: Int get() = Themes.look.button
     const val GREEN = 0xFF2EE68A.toInt()
     const val PURPLE = 0xFFB57BFF.toInt()
     const val AMBER = 0xFFFFC640.toInt()
