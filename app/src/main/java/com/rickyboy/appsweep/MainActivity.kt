@@ -995,10 +995,11 @@ class MainActivity : AppCompatActivity() {
         currentApps = if (easyMode) {
             apps.sortedByDescending { it.openedAt }          // most recently opened first
         } else {
-            apps.sortedByDescending { it.memoryKb }          // biggest RAM users first
+            apps.sortedWith(compareBy<RunningApp> { it.isParked }.thenByDescending { it.memoryKb })   // active first, then parked; biggest RAM users first
         }
         adapter.items = currentApps
-        val userApps = currentApps.count { !it.isSystem && it.isRunning }
+        // only apps that are really active count; parked (cached) ones are listed greyed out underneath
+        val userApps = currentApps.count { !it.isSystem && it.isRunning && !it.isParked }
         appsCountText.text = colored("LAUNCHED APPS: ", 0, "$userApps", Hud.CYAN)
         tvAutoButton.visibility = if (tvGuided && !busy) View.VISIBLE else View.GONE
         if (tvList) {
@@ -1013,12 +1014,16 @@ class MainActivity : AppCompatActivity() {
                 "Most recently opened first · Tap an app for options · Hold to close it"
             }
         } else {
-            listHeader.text = colored("RUNNING APPS ", 0, "[ $userApps ]", Hud.CYAN)
-            listHint.text = if (userApps == 0) {
-                "No apps running in the background. All clean!"
+            listHeader.text = colored("ACTIVE APPS ", 0, "[ $userApps ]", Hud.CYAN)
+            val parked = currentApps.count { !it.isSystem && it.isRunning && it.isParked }
+            val parkedNote = if (parked > 0)
+                "\nGreyed out: $parked parked by Android (paused, no battery use). Other apps and notifications can wake apps briefly; Android parks them again."
+            else ""
+            listHint.text = (if (userApps == 0) {
+                "No apps active in the background. All clean!"
             } else {
-                "Biggest RAM users first · Tap an app for options · Hold to close it"
-            }
+                "Active apps first, biggest RAM users first · Tap an app for options · Hold to close it"
+            }) + parkedNote
         }
     }
 

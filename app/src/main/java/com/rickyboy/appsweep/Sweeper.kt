@@ -68,6 +68,7 @@ class Sweeper(private val ctx: Context) {
         val remembered = rememberedSet.filter { it !in running && it !in skip }
         val candidates = running + remembered
         val blocked = readBackgroundBlocked(candidates)
+        val active = readActivePackages()
 
         return candidates.mapNotNull { pkg ->
             val info = try {
@@ -85,7 +86,9 @@ class Sweeper(private val ctx: Context) {
                 isSystem = pkg !in launchable,
                 isProtected = pkg in protected,
                 backgroundBlocked = pkg in blocked || pkg in rememberedSet,
-                isRunning = pkg in memory
+                isRunning = pkg in memory,
+                // parked = Android has it cached (paused); unknown state counts as active
+                isParked = active != null && pkg in memory && pkg !in active && (cpu[pkg] ?: 0f) < 0.5f
             )
         }
     }
@@ -165,6 +168,27 @@ class Sweeper(private val ctx: Context) {
             result[pkg] = (result[pkg] ?: 0L) + (cols[rssIndex].toLongOrNull() ?: 0L)
         }
         return result
+    }
+
+    /**
+     * Packages with at least one process that's really doing something (foreground, visible,
+     * running a service, playing audio…). Everything else in memory is cached: paused by Android.
+     * Returns null if Android's process list can't be read, so nothing is wrongly marked parked.
+     */
+    private fun readActivePackages(): Set<String>? {
+        val out = try { Shell.exec("dumpsys activity lru") } catch (_: Exception) { return null }
+        // e.g.  "  #12: cch+5  CEM  ----  12345:com.example.app/u0a123"
+        val line = Regex("""^\s*#\d+:\s*(\S+)\s.*?\d+:([A-Za-z0-9_.]+)(?::[^/\s]*)?/""")
+        val active = HashSet<String>()
+        var seen = 0
+        for (l in out.lines()) {
+            val m = line.find(l) ?: continue
+            seen++
+            val state = m.groupValues[1].lowercase()
+            val cached = state.startsWith("cch") || state.startsWith("cac") || state.startsWith("empty")
+            if (!cached) active.add(m.groupValues[2])
+        }
+        return if (seen == 0) null else active
     }
 
     /** Recent CPU load per package, from `dumpsys cpuinfo`. */

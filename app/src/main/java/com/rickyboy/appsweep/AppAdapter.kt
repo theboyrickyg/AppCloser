@@ -20,7 +20,8 @@ data class RunningApp(
     val isProtected: Boolean,
     val backgroundBlocked: Boolean,   // auto-start blocked
     val isRunning: Boolean = true,
-    val openedAt: Long = 0L           // Easy mode: when you last opened it
+    val openedAt: Long = 0L,          // Easy mode: when you last opened it
+    val isParked: Boolean = false     // in memory but paused by Android (cached): no CPU, no battery
 )
 
 class AppAdapter(
@@ -65,10 +66,15 @@ class AppAdapter(
         val ctx = holder.itemView.context
         holder.icon.setImageDrawable(app.icon)
         holder.name.text = app.label
+        // parked apps are greyed out: Android has paused them already
+        holder.itemView.alpha = if (!easyMode && app.isRunning && app.isParked) 0.55f else 1f
 
         val parts = mutableListOf<String>()
         if (easyMode) {
             parts.add("Opened ${ago(app.openedAt)}")
+        } else if (app.isRunning && app.isParked) {
+            parts.add("Parked · paused, no battery use")
+            parts.add("${formatKb(app.memoryKb)} RAM")
         } else if (app.isRunning) {
             parts.add("${formatKb(app.memoryKb)} RAM")
             parts.add(String.format("%.1f%% CPU", app.cpuPercent))
