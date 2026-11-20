@@ -567,8 +567,10 @@ class SweepAccessibilityService : AccessibilityService() {
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-                // touchable on purpose: it soaks up taps so nothing interrupts the pairing
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                // NOT touchable: a cover that takes touches hides the Settings screen underneath
+                // from App Closer too, so it couldn't find Wireless debugging. Same as the sweep cover.
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT
             )
             (getSystemService(WINDOW_SERVICE) as WindowManager).addView(v, params)

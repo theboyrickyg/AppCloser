@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Covers the screen while App Closer pairs itself; it also soaks up touches so nothing gets in the way -->
+<!-- Covers the screen while App Closer pairs itself (touches pass through, so it can still see Settings underneath) -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg"
-    android:clickable="true">
+    android:background="@color/bg">
 
     <LinearLayout
         android:layout_width="match_parent"
