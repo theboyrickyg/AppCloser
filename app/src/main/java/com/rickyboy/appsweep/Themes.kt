@@ -7,6 +7,8 @@ import android.content.Context
  * Each one recolours the background, the panel edges, the title and the main button.
  */
 object Themes {
+    /** Parked for now: everyone gets the standard look until the cleaning is fully tested. */
+    const val ENABLED = false
 
     data class Look(
         val id: String,
@@ -52,6 +54,7 @@ object Themes {
     fun load(ctx: Context): Look {
         val id = prefs(ctx).getString("theme", "cyan")
         val chosen = all.firstOrNull { it.id == id } ?: all[0]
+        if (!ENABLED) { look = all[0]; return look }
         look = if (chosen == all[0] || Unlock.isUnlocked(ctx)) chosen else all[0]
         return look
     }

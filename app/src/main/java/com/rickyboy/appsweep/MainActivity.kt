@@ -1356,6 +1356,8 @@ class MainActivity : AppCompatActivity() {
             setShadowLayer(14f * resources.displayMetrics.density / 2, 0f, 0f, (look.edge and 0x00FFFFFF) or 0xAA000000.toInt())
         }
         appsCountText.setTextColor(0xFFE6F7FF.toInt())
+        // Themes are parked for now: hidden until the cleaning itself is fully tested
+        findViewById<Button>(R.id.themeButton)?.visibility = if (Themes.ENABLED) View.VISIBLE else View.GONE
         findViewById<Button>(R.id.themeButton)?.apply {
             background = HudDrawable(resources.displayMetrics.density, look.edge,
                 0xFF0B1A28.toInt(), 0xFF081320.toInt(), cut = 7f, glow = false, accents = false)
