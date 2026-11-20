@@ -504,9 +504,20 @@ class SweepAccessibilityService : AccessibilityService() {
         }
         delay(900)
         status("Finding Wireless debugging…")
-        val wd = waitFor(2500) { find(pairTexts.wireless) } ?: findWithScroll(pairTexts.wireless, 25)
-            ?: return "Couldn't find Wireless debugging. Is Developer options switched on?"
-        click(wd)
+        var wd = waitFor(2500) { find(pairTexts.wireless) } ?: findWithScroll(pairTexts.wireless, 25)
+        if (wd == null) {
+            // some phones hide Settings from App Closer while the cover is up: look again without it
+            withContext(Dispatchers.Main) { hidePairOverlay() }
+            delay(400)
+            wd = waitFor(1500) { find(pairTexts.wireless) } ?: findWithScroll(pairTexts.wireless, 25)
+            withContext(Dispatchers.Main) { showPairOverlay() }
+        }
+        if (wd == null) {
+            return if (Adb.developerOptionsOn(applicationContext))
+                "Couldn't find Wireless debugging in Developer options. Tap \"Enter the code myself instead\"."
+            else "Developer options aren't on yet. Do Part 1 first."
+        }
+        click(wd!!)
         // wait for the Wireless debugging page (its switch or the pairing row)
         waitFor(3000) { walkFind(1) { it.isCheckable }.firstOrNull() ?: find(pairTexts.pairCode) }
         delay(300)
