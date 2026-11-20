@@ -21,6 +21,7 @@ data class SweepResult(val closed: Int, val ramFreed: Long, val cacheFreed: Long
  */
 class Sweeper(private val ctx: Context) {
 
+
     private val pm: PackageManager = ctx.packageManager
     private val prefs = ctx.getSharedPreferences("appsweep", Context.MODE_PRIVATE)
 
@@ -53,9 +54,16 @@ class Sweeper(private val ctx: Context) {
     }
 
     fun scan(includeSystem: Boolean): List<RunningApp> {
-        val memory = readProcessMemory()
+        // One trip to the shell for processes, process states and CPU (each trip has a cost)
+        val all = try {
+            Shell.exec("ps -A -o RSS,NAME 2>/dev/null; echo '@@LRU'; dumpsys activity lru; echo '@@CPU'; dumpsys cpuinfo")
+        } catch (_: Exception) { "" }
+        val psOut = all.substringBefore("@@LRU")
+        val lruOut = all.substringAfter("@@LRU", "").substringBefore("@@CPU")
+        val cpuOut = all.substringAfter("@@CPU", "")
+        val memory = readProcessMemory(psOut)
         if (memory.isEmpty()) return emptyList()
-        val cpu = readCpu()
+        val cpu = readCpu(cpuOut)
         val launchable = launchablePackages()
         val skip = neverClose()
         val protected = protectedApps()
@@ -68,7 +76,7 @@ class Sweeper(private val ctx: Context) {
         val remembered = rememberedSet.filter { it !in running && it !in skip }
         val candidates = running + remembered
         val blocked = readBackgroundBlocked(candidates)
-        val active = readActivePackages()
+        val active = readActivePackages(lruOut)
 
         return candidates.mapNotNull { pkg ->
             val info = try {
@@ -82,7 +90,7 @@ class Sweeper(private val ctx: Context) {
                 icon = try { info.loadIcon(pm) } catch (_: Exception) { null },
                 memoryKb = memory[pkg] ?: 0L,
                 cpuPercent = cpu[pkg] ?: 0f,
-                cacheBytes = cacheBytes(pkg),
+                cacheBytes = cachedCacheBytes(pkg),
                 isSystem = pkg !in launchable,
                 isProtected = pkg in protected,
                 backgroundBlocked = pkg in blocked || pkg in rememberedSet,
@@ -152,8 +160,8 @@ class Sweeper(private val ctx: Context) {
     }
 
     /** RAM per package, from `ps` (sums every process an app has). */
-    private fun readProcessMemory(): Map<String, Long> {
-        var output = Shell.exec("ps -A -o RSS,NAME 2>/dev/null")
+    private fun readProcessMemory(given: String? = null): Map<String, Long> {
+        var output = given ?: Shell.exec("ps -A -o RSS,NAME 2>/dev/null")
         if (output.lines().size < 5) output = Shell.exec("ps") // very old Android
         val lines = output.lines().filter { it.isNotBlank() }
         if (lines.isEmpty()) return emptyMap()
@@ -175,8 +183,8 @@ class Sweeper(private val ctx: Context) {
      * running a service, playing audio…). Everything else in memory is cached: paused by Android.
      * Returns null if Android's process list can't be read, so nothing is wrongly marked parked.
      */
-    private fun readActivePackages(): Set<String>? {
-        val out = try { Shell.exec("dumpsys activity lru") } catch (_: Exception) { return null }
+    private fun readActivePackages(given: String? = null): Set<String>? {
+        val out = given ?: try { Shell.exec("dumpsys activity lru") } catch (_: Exception) { return null }
         // e.g.  "  #12: cch+5  CEM  ----  12345:com.example.app/u0a123"
         val line = Regex("""^\s*#\d+:\s*(\S+)\s.*?\d+:([A-Za-z0-9_.]+)(?::[^/\s]*)?/""")
         val active = HashSet<String>()
@@ -192,10 +200,10 @@ class Sweeper(private val ctx: Context) {
     }
 
     /** Recent CPU load per package, from `dumpsys cpuinfo`. */
-    private fun readCpu(): Map<String, Float> {
+    private fun readCpu(given: String? = null): Map<String, Float> {
         val regex = Regex("""^\s*([\d.]+)%\s+\d+/([^\s:]+)""")
         val result = HashMap<String, Float>()
-        for (line in Shell.exec("dumpsys cpuinfo").lines()) {
+        for (line in (given ?: Shell.exec("dumpsys cpuinfo")).lines()) {
             val m = regex.find(line) ?: continue
             val pct = m.groupValues[1].toFloatOrNull() ?: continue
             val pkg = m.groupValues[2]
@@ -207,19 +215,33 @@ class Sweeper(private val ctx: Context) {
     private fun readBackgroundBlocked(pkgs: List<String>): Set<String> {
         if (Build.VERSION.SDK_INT < 26 || pkgs.isEmpty()) return emptySet()
         val op = if (Build.VERSION.SDK_INT >= 28) "RUN_ANY_IN_BACKGROUND" else "RUN_IN_BACKGROUND"
-        val script = pkgs.joinToString("; ") { "echo \"@@$it\"; appops get $it $op" }
-        val result = HashSet<String>()
-        var current: String? = null
-        for (line in Shell.exec(script).lines()) {
-            if (line.startsWith("@@")) {
-                current = line.removePrefix("@@").trim()
-            } else if (current != null && line.contains(op) &&
-                (line.contains("ignore") || line.contains("deny"))
-            ) {
-                result.add(current)
+        // Asked once per app, then remembered (it only changes when App Closer changes it)
+        val unknown = pkgs.filter { it !in blockedKnown }
+        if (unknown.isNotEmpty()) {
+            val script = unknown.joinToString("; ") { "echo \"@@$it\"; appops get $it $op" }
+            val found = HashSet<String>()
+            var current: String? = null
+            for (line in Shell.exec(script).lines()) {
+                if (line.startsWith("@@")) {
+                    current = line.removePrefix("@@").trim()
+                } else if (current != null && line.contains(op) &&
+                    (line.contains("ignore") || line.contains("deny"))
+                ) {
+                    found.add(current)
+                }
             }
+            unknown.forEach { blockedKnown[it] = it in found }
         }
-        return result
+        return pkgs.filter { blockedKnown[it] == true }.toSet()
+    }
+
+    /** Cache size, re-read at most once a minute per app (reading it is slow-ish). */
+    private fun cachedCacheBytes(pkg: String): Long {
+        val now = System.currentTimeMillis()
+        cacheSeen[pkg]?.let { (at, bytes) -> if (now - at < 60_000) return bytes }
+        val bytes = cacheBytes(pkg)
+        cacheSeen[pkg] = now to bytes
+        return bytes
     }
 
     fun cacheBytes(pkg: String): Long {
@@ -307,6 +329,7 @@ class Sweeper(private val ctx: Context) {
         if (block) cmds.add("am force-stop $pkg")
         Shell.exec(cmds.joinToString("; "))
         rememberAutoStart(pkg, block)
+        blockedKnown[pkg] = block
     }
 
     /** The big button. [onProgress] gets 0–100 as it goes (called from a background thread). */
@@ -316,6 +339,7 @@ class Sweeper(private val ctx: Context) {
         onClosed: (String) -> Unit = {},
         clearRecents: Boolean = false
     ): SweepResult {
+        forgetCacheSizes()
         val targets = apps.filter { it.isRunning && !it.isProtected && !it.isSystem }
         val ramBefore = availableRam()
         val diskBefore = freeStorage()
@@ -375,6 +399,11 @@ class Sweeper(private val ctx: Context) {
     fun freeStorage(): Long = StatFs(Environment.getDataDirectory().path).availableBytes
 
     companion object {
+        private val blockedKnown = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+        private val cacheSeen = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, Long>>()
+        /** After a clean the cache figures are out of date. */
+        fun forgetCacheSizes() = cacheSeen.clear()
+
         val canClearSingleCache = Build.VERSION.SDK_INT >= 34
         val canBlockBackground = Build.VERSION.SDK_INT >= 26
 

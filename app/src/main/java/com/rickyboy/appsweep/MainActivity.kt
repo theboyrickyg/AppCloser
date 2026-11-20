@@ -76,6 +76,7 @@ class MainActivity : AppCompatActivity() {
     private var scanJob: Job? = null
     private var usageGranted = false
     private var lastTotalCache = -1L
+    private var cacheJob: kotlinx.coroutines.Job? = null
     private val prefs by lazy { getSharedPreferences("appsweep", Context.MODE_PRIVATE) }
 
     private var setupJob: Job? = null
@@ -197,11 +198,11 @@ class MainActivity : AppCompatActivity() {
         updateMemory()
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                // Gauge every 2 s, app list every 6 s — no refresh button needed
+                // Gauge every 2 s, app list every 4 s — no refresh button needed
                 var tick = 0
                 while (true) {
                     updateMemory()
-                    if (tick % 3 == 2 && ready && !busy) refresh(silent = true)
+                    if (tick % 2 == 1 && ready && !busy) refresh(silent = true)
                     tick++
                     delay(2000)
                 }
@@ -984,10 +985,14 @@ class MainActivity : AppCompatActivity() {
             }
             // Total cache across all installed apps takes a moment, so only work it out
             // on a full refresh (start-up, after a sweep), not on the quiet 6-second updates
-            if (!silent || lastTotalCache < 0) {
-                lastTotalCache = withContext(Dispatchers.IO) { sweeper.totalCache() }
-            }
+            // ...and do it on its own, so it never holds up the next list update
             updateStats(apps, lastTotalCache)
+            if ((!silent || lastTotalCache < 0) && cacheJob?.isActive != true) {
+                cacheJob = lifecycleScope.launch {
+                    lastTotalCache = withContext(Dispatchers.IO) { sweeper.totalCache() }
+                    updateStats(currentApps, lastTotalCache)
+                }
+            }
         }
     }
 
