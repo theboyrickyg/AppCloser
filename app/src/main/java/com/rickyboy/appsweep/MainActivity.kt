@@ -184,7 +184,7 @@ class MainActivity : AppCompatActivity() {
         sweepButton.setOnClickListener { sweepAll() }
         instantLink = findViewById(R.id.instantLink)
         instantLink.setOnClickListener {
-            if (setupChoice == "pro" && Adb.hasWorkedBefore(this) && Unlock.isUnlocked(this)) checkConnection(userAsked = true)
+            if (setupChoice == "pro" && Adb.hasWorkedBefore(this)) checkConnection(userAsked = true)
             else startInstantSetup()
         }
         applyHudTheme()
@@ -226,10 +226,10 @@ class MainActivity : AppCompatActivity() {
         }
         autoSweepPending = intent?.getBooleanExtra("auto_sweep", false) == true
 
-        // App Closer Unlimited: restore any past purchase and fetch the price
+        // App Closer Pro: restore any past purchase and fetch the price
         Unlock.onUnlocked = {
             unlockDialog?.dismiss()
-            toast("App Closer Unlimited unlocked ✓ Thank you!")
+            toast("App Closer Pro unlocked ✓ Thank you!")
         }
         Unlock.connect(this)
         if (intent?.getBooleanExtra("show_unlock", false) == true) sweepButton.post { showUnlock() }
@@ -466,10 +466,6 @@ class MainActivity : AppCompatActivity() {
             scrollToTop(statusCard)
         }
         rapid.setOnClickListener {
-            if (!Unlock.isUnlocked(this)) {
-                showUnlock()
-                return@setOnClickListener
-            }
             setupChoice = "pro"
             resetStatusTextStyle()
             hideSetupExtras()
@@ -977,7 +973,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun sweepAll() {
         if (busy || !ready) return
-        if (!Unlock.canClean(this)) {
+        val rapidNow = Shell.isReady()
+        // Basic: 5 free Close All cleans. Rapid: 3 free tries. Then Pro.
+        if (if (rapidNow) !Unlock.canRapid(this) else !Unlock.canClean(this)) {
             showUnlock()
             return
         }
@@ -1000,7 +998,7 @@ class MainActivity : AppCompatActivity() {
             if (!svc.sweep(targets.map { it.packageName to it.label }, clearRecents = Prefs.clearRecents(this))) endSweepUi()
             return
         }
-        countFreeClean()
+        countFreeRapid()
         startSweepUi()
         lifecycleScope.launch {
             val clearRecents = Prefs.clearRecents(this@MainActivity)
@@ -1309,12 +1307,8 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    /** ⚡ Instant mode: Developer options + pairing. Part of App Closer Unlimited. */
+    /** ⚡ Rapid Total Clean: Developer options + pairing. Free to set up and try; then part of Pro. */
     private fun startInstantSetup() {
-        if (!Unlock.isUnlocked(this)) {
-            showUnlock()
-            return
-        }
         AlertDialog.Builder(this)
             .setTitle("⚡ Rapid Total Clean")
             .setMessage(
@@ -1451,6 +1445,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Counts one free Rapid try and says how many are left. */
+    private fun countFreeRapid() {
+        if (Unlock.isUnlocked(this)) return
+        Unlock.useRapid(this)
+        val left = Unlock.freeRapidLeft(this)
+        toast(if (left == 0) "That was your last free Rapid clean" else "Free Rapid clean ${Unlock.rapidUsed(this)} of ${Unlock.FREE_RAPID}")
+    }
+
     /** Counts one free Close All clean and says how many are left. */
     private fun countFreeClean() {
         if (Unlock.isUnlocked(this)) return
@@ -1471,10 +1473,11 @@ class MainActivity : AppCompatActivity() {
             colored("You've closed ", 0, "$closed apps", RED, " and cleared ", 0,
                 AppAdapter.formatBytes(cache), GREEN, " of cache with App Closer.")
         } else {
-            "You've used your ${Unlock.FREE_CLEANS} free cleans."
+            if (Unlock.freeRapidLeft(this) == 0) "You've used your ${Unlock.FREE_RAPID} free Rapid cleans."
+            else "You've used your ${Unlock.FREE_CLEANS} free Basic cleans."
         }
         fun setPrice() {
-            buy.text = Unlock.price()?.let { "UNLOCK FOR $it · ONE-OFF" } ?: "UNLOCK · ONE-OFF"
+            buy.text = Unlock.price()?.let { "GET PRO FOR $it · ONE-OFF" } ?: "GET PRO · ONE-OFF"
         }
         setPrice()
         Unlock.connect(this) { if (unlockDialog?.isShowing == true) setPrice() }
@@ -1573,7 +1576,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setBlocked(app: RunningApp, block: Boolean) {
-        if (block && !Unlock.canClean(this)) {
+        if (block && !Unlock.canRapid(this)) {
             showUnlock()
             return
         }

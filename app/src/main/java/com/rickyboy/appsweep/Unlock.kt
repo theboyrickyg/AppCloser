@@ -15,16 +15,17 @@ import com.android.billingclient.api.QueryProductDetailsParams
 import com.android.billingclient.api.QueryPurchasesParams
 
 /**
- * App Closer Unlimited: a one-off Google Play purchase.
+ * App Closer Pro: a one-off Google Play purchase.
  *
- * Free: the first [FREE_CLEANS] Close All cleans do everything. After that the RAM gauge, the list
- * and closing apps one at a time still work, but Close All, Quick Sweep and auto-start blocking
- * need Unlimited.
+ * Free: [FREE_CLEANS] Basic Close All cleans, then apps are closed one at a time with the ✕.
+ * Rapid Total Clean can be set up for free and tried [FREE_RAPID] times; after that it (and
+ * auto-start blocking) needs Pro. Pro also makes Basic cleans unlimited.
  */
 object Unlock {
     const val FREE_CLEANS = 5
+    const val FREE_RAPID = 3
     /** The in-app product ID. Create a one-time product with exactly this ID in Play Console. */
-    const val PRODUCT_ID = "app_closer_unlimited"
+    const val PRODUCT_ID = "app_closer_pro"
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences("unlock", Context.MODE_PRIVATE)
 
@@ -38,7 +39,18 @@ object Unlock {
     fun freeCleansLeft(ctx: Context): Int = (FREE_CLEANS - cleansUsed(ctx)).coerceAtLeast(0)
     fun canClean(ctx: Context): Boolean = isUnlocked(ctx) || freeCleansLeft(ctx) > 0
 
-    /** Call when a Close All clean starts. */
+    // ---------- Rapid Total Clean trial ----------
+
+    fun rapidUsed(ctx: Context): Int = prefs(ctx).getInt("rapid_used", 0)
+    fun freeRapidLeft(ctx: Context): Int = (FREE_RAPID - rapidUsed(ctx)).coerceAtLeast(0)
+    fun canRapid(ctx: Context): Boolean = isUnlocked(ctx) || freeRapidLeft(ctx) > 0
+
+    fun useRapid(ctx: Context) {
+        if (isUnlocked(ctx)) return
+        prefs(ctx).edit().putInt("rapid_used", rapidUsed(ctx) + 1).apply()
+    }
+
+    /** Call when a Basic Close All clean starts. */
     fun useClean(ctx: Context) {
         if (isUnlocked(ctx)) return
         prefs(ctx).edit().putInt("cleans_used", cleansUsed(ctx) + 1).apply()

@@ -32,8 +32,8 @@ class QuickSweepActivity : AppCompatActivity() {
         }
 
         val sweeper = Sweeper(applicationContext)
-        // Free cleans used up: open App Closer on its unlock screen instead
-        if (!Unlock.canClean(this)) {
+        // Free cleans used up (Basic 5 / Rapid 3): open App Closer on its Pro screen instead
+        if (if (Shell.isReady()) !Unlock.canRapid(this) else !Unlock.canClean(this)) {
             startActivity(Intent(this, MainActivity::class.java).putExtra("show_unlock", true))
             finishAndRemoveTask()
             return
@@ -75,7 +75,7 @@ class QuickSweepActivity : AppCompatActivity() {
                 return@launch
             }
             status.text = "Cleaning…"
-            Unlock.useClean(applicationContext)
+            Unlock.useRapid(applicationContext)
             val r = withContext(Dispatchers.IO) {
                 sweeper.sweepAll(sweeper.scan(includeSystem = false), clearRecents = Prefs.clearRecents(applicationContext))
             }

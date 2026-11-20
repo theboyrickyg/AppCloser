@@ -26,7 +26,7 @@
             android:layout_marginTop="10dp"
             android:gravity="center"
             android:letterSpacing="0.1"
-            android:text="UNLOCK APP CLOSER"
+            android:text="APP CLOSER PRO"
             android:textColor="@color/text_main"
             android:textSize="20sp"
             android:textStyle="bold" />
@@ -45,7 +45,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:lineSpacingExtra="6dp"
-            android:text="✓  Close All &amp; Clear Cache, unlimited\n✓  Quick Sweep tile and shortcut\n✓  Stop apps auto-starting\n✓  ⚡ Rapid Total Clean: closes everything in seconds\n✓  Works on your phone and TV\n✓  One payment. No subscription, no ads"
+            android:text="🔥  Rapid Total Clean: everything closed and every cache cleared in seconds\n✓  Block apps from auto-starting\n✓  Unlimited Basic cleans\n✓  Quick Sweep tile and shortcut\n✓  Works on your phone and TV\n✓  One payment. No subscription, no ads"
             android:textColor="@color/text_main"
             android:textSize="15sp" />
 
@@ -57,7 +57,7 @@
             android:background="@drawable/bg_sweep_button"
             android:letterSpacing="0.06"
             android:stateListAnimator="@null"
-            android:text="UNLOCK · ONE-OFF"
+            android:text="GET PRO · ONE-OFF"
             android:textColor="@color/text_main"
             android:textSize="17sp"
             android:textStyle="bold" />
