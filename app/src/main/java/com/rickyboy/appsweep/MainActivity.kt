@@ -326,7 +326,10 @@ class MainActivity : AppCompatActivity() {
         // Normal mode running: offer Instant mode (or reconnecting it, if it was set up before)
         instantLink.visibility = if (!isTv && isReady && !Shell.isReady()) View.VISIBLE else View.GONE
         instantLink.text = rapidLabel(setupChoice == "pro" && Adb.hasWorkedBefore(this))
-        if (!busy) sweepButton.text = sweepLabel()
+        if (!busy) {
+            sweepButton.text = sweepLabel()
+            if (Themes.look.skin == null) setSweepLook(cleaning = false)
+        }
         statusCard.visibility = if (isReady) View.GONE else View.VISIBLE
         sweepButton.isEnabled = isReady && !busy
         sweepButton.alpha = if (isReady) 1f else 0.4f
@@ -1434,8 +1437,7 @@ class MainActivity : AppCompatActivity() {
         (statRam.parent as? View)?.background = Hud.statBox(this, Hud.GREEN)
         (statCache.parent as? View)?.background = Hud.statBox(this, Hud.PURPLE)
         // the upgrade: warm fiery orange, so it stands out and invites a tap
-        instantLink.background = HudDrawable(resources.displayMetrics.density, 0xFFFF8A1E.toInt(),
-            0xFF4A1E06.toInt(), 0xFF2A0F04.toInt(), cut = 16f)
+        makeHot(instantLink)
         look.skin?.let { applySkin(it) }
     }
 
@@ -1443,10 +1445,12 @@ class MainActivity : AppCompatActivity() {
     private fun sweepLabel(): CharSequence {
         val rapid = Shell.isReady()
         val sb = android.text.SpannableStringBuilder(
-            if (rapid) "[ RAPID TOTAL CLEAN & CACHE CLEAR ]" else "[ BASIC CLEAN & CACHE CLEAR ]"
+            if (rapid) "RAPID TOTAL CLEAN" else "[ BASIC CLEAN & CACHE CLEAR ]"
         )
         val st = sb.length
-        sb.append(if (rapid) "\nInstant complete clean (confident user)" else "\nIndividual app closer (average user)")
+        // in Rapid they're already in the zone: no need to sell it to them, just the name
+        if (rapid) return sb
+        sb.append("\nIndividual app closer (average user)")
         sb.setSpan(android.text.style.RelativeSizeSpan(0.62f), st, sb.length, 0)
         sb.setSpan(android.text.style.ForegroundColorSpan(if (rapid) 0xFFFFB23A.toInt() else Hud.CYAN), st, sb.length, 0)
         return sb
@@ -1470,9 +1474,26 @@ class MainActivity : AppCompatActivity() {
         sweepButton.background = if (skin != null) {
             android.graphics.drawable.BitmapDrawable(resources, android.graphics.BitmapFactory.decodeResource(
                 resources, if (cleaning) skin.rapid else skin.basic, android.graphics.BitmapFactory.Options().apply { inScaled = false }))
+        } else if (!cleaning && Shell.isReady()) {
+            makeHot(sweepButton)
+            return
         } else {
             Hud.button(this, if (cleaning) Hud.GREEN else Hud.BLUE)
         }
+        // back to the normal look
+        val d = resources.displayMetrics.density
+        sweepButton.setPadding((12 * d).toInt(), sweepButton.paddingTop, (12 * d).toInt(), sweepButton.paddingBottom)
+        sweepButton.setShadowLayer(10f, 0f, 0f, 0xAA35D7FF.toInt())
+    }
+
+    /** The hot Rapid look: orange glow, flames off the corners, a speedometer at each end. */
+    private fun makeHot(b: android.widget.Button) {
+        val d = resources.displayMetrics.density
+        b.background = HotButtonDrawable(d)
+        val side = (HotButtonDrawable.SIDE_DP * d).toInt()
+        b.setPadding(side, (14 * d).toInt(), side, (14 * d).toInt())
+        b.setShadowLayer(12f, 0f, 0f, 0xFFFF7A18.toInt())
+        (b as? SpeedButton)?.fire = false
     }
 
     /** Illustrated theme: put the theme's pictures behind every part of the screen. */
